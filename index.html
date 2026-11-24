@@ -227,7 +227,7 @@ function spawnBoss(idx) {
   enemies.push({ type:'boss', boss:true, final:idx === 5, kit:BOSS_KITS[idx - 1], name:b.name, idx, x:p.x, y:p.y, hp, maxHp:hp, speed:55 + idx*4,
     dmg:(30 + idx*8) * (1 + time / 300), r:48, size:120, icon:b.icon, gem:5, flash:0, hitCd:0, gHit:0, kx:0, ky:0, kbMul:0.05,
     atkT:3, dashT:0, windT:0, dx:0, dy:0, spiralT:0, spiralCd:0, spiralA:0 });
-  banner = 3; bannerTxt = idx === 5 ? '⚠ 최종 보스 : ' + b.name + ' ⚠' : '⚠ BOSS : ' + b.name + ' 출현! ⚠';
+  bossT = 1e9; banner = 3; bannerTxt = idx === 5 ? '⚠ 최종 보스 : ' + b.name + ' ⚠' : '⚠ BOSS : ' + b.name + ' 출현! ⚠';
 }
 function bossShoot(e, a, spd) { ebullets.push({ x:e.x, y:e.y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:5, r:9, dmg:e.dmg*0.45 }); }
 function bossAI(e, dt) {
@@ -305,8 +305,9 @@ function director(dt) {
       itemT = rand(30, 60) * itemMul();
     } else itemT = 3;
   }
-  bossT -= dt;
-  if (bossT <= 0 && bossN < 5) { bossT = 180; spawnBoss(++bossN); }   // 3분마다 보스
+  const bossAlive = enemies.some(e => e.boss);
+  if (!bossAlive) bossT -= dt;                          // 보스가 살아있는 동안은 다음 보스 타이머 정지
+  if (!bossAlive && bossT <= 0 && bossN < 5) spawnBoss(++bossN);   // 첫 보스 3분, 이후 보스 처치 5분 뒤
   warlordT -= dt;                                  // 6분 40초~: 워로드, 10분~: 콜로서스
   if (time > 400 && warlordT <= 0) { warlordT = Math.max(15, 40 - (time - 400) / 20); spawnEnemy('warlord'); }
   colossusT -= dt;
@@ -331,6 +332,7 @@ function killEnemy(e) {
     items.push({ x:e.x, y:e.y, kind:'chest' }, { x:e.x + 50, y:e.y, kind:'meat' }, { x:e.x - 50, y:e.y, kind:'magnet' });
     banner = 2.5; bannerTxt = `${e.name} 처치!`;
     ebullets = []; hazards = [];
+    bossT = 300;                       // 처치 5분 뒤 다음 보스
     if (e.final) victory();
     for (let i = 0; i < 30; i++) particles.push({ x:e.x, y:e.y, vx:rand(-220,220), vy:rand(-220,220), t:0.7, c:'#fc4' });
     return;
@@ -1883,7 +1885,7 @@ function drawHUD() {
   icon('coin', W - 28, 86, 18); text(String(P.gold), W - 42, 92, 16, '#ffd54a', 'right');
   text('보유 ' + SAVE.gold, W - 16, 112, 14, '#ffe9a0', 'right');
   const bs = Math.max(0, Math.ceil(bossT));
-  text(bossN >= 5 ? '최종 보스 등장!' : `다음 보스: ${Math.floor(bs/60)}:${String(bs%60).padStart(2,'0')}`, W - 16, 64, 13, '#f99', 'right');
+  text(enemies.some(e => e.boss) ? '보스 전투 중!' : bossN >= 5 ? '최종 보스 처치!' : `다음 보스: ${Math.floor(bs/60)}:${String(bs%60).padStart(2,'0')}`, W - 16, 64, 13, '#f99', 'right');
   // 스킬 슬롯 (줄바꿈, 클릭하면 설명)
   hudRects = [];
   const cols = Math.max(2, Math.min(8, Math.floor((W / 2 - 300 - 16) / 48)));
