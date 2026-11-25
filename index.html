@@ -28,6 +28,9 @@ addEventListener('keydown', e => {
   if (state === 'title' && (k === 'enter' || k === ' ')) start();
   if ((state === 'title' || state === 'over' || state === 'win') && k === 's') openShop();
   if (state === 'shop' && (k === 'escape' || k === 'backspace')) closeShop();
+  if (state === 'changelog' && (k === 'escape' || k === 'backspace' || k === 'enter')) state = 'title';
+  if (state === 'changelog' && (k === 'arrowdown' || k === 'pagedown')) clScroll = Math.min(clMax, clScroll + 80);
+  if (state === 'changelog' && (k === 'arrowup' || k === 'pageup')) clScroll = Math.max(0, clScroll - 80);
   if (state === 'shop' && (k === '1' || k === '2' || k === '3')) { shopTab = +k - 1; shopScroll = 0; }
   if (state === 'shop' && (k === 'arrowdown' || k === 'pagedown')) shopScroll = Math.min(shopMax, shopScroll + 80);
   if (state === 'shop' && (k === 'arrowup' || k === 'pageup')) shopScroll = Math.max(0, shopScroll - 80);
@@ -38,7 +41,10 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 let mouse = {x:0,y:0};
-cv.addEventListener('wheel', e => { if (state === 'shop') { shopScroll = Math.max(0, Math.min(shopMax, shopScroll + e.deltaY)); e.preventDefault(); } }, { passive:false });
+cv.addEventListener('wheel', e => {
+  if (state === 'shop') { shopScroll = Math.max(0, Math.min(shopMax, shopScroll + e.deltaY)); e.preventDefault(); }
+  else if (state === 'changelog') { clScroll = Math.max(0, Math.min(clMax, clScroll + e.deltaY)); e.preventDefault(); }
+}, { passive:false });
 cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 cv.addEventListener('click', e => {
   if (state === 'levelup') {
@@ -49,7 +55,7 @@ cv.addEventListener('click', e => {
     const h = hudRects.find(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
     if (h) { infoKey = h.k; infoFrom = state; state = 'info'; }
     else if (state === 'pause') for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
-  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop') {
+  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog') {
     for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
   }
 });
@@ -94,7 +100,7 @@ const UPGRADES = {
   scroll:   { name:'닌자 스크롤', icon:'scroll', desc: l => l===0 ? '경험치 획득량 +20%' : '경험치 획득량 +20% 추가',
               evo:{ name:'비전서',     icon:'book', desc:'경험치 3배, 보석 흡수 범위 대폭 증가' } },
   heart:    { name:'체력 증가',   icon:'heart', desc: l => l===0 ? '최대 체력 +100, 즉시 회복' : '최대 체력 +100 추가',
-              evo:{ name:'불사의 심장', icon:'heartEvo', desc:'최대 체력 +200, 초당 2 재생, 사망 시 1회 부활' } },
+              evo:{ name:'불사의 심장', icon:'heartEvo', desc:'최대 체력 +200, 초당 5 재생, 사망 시 1회 부활' } },
   clock:    { name:'쿨타임 감소', icon:'stopwatch', desc: l => l===0 ? '모든 무기 쿨타임 -7%' : '쿨타임 추가 감소',
               evo:{ name:'시간 정지',   icon:'hourglass', desc:'쿨타임 -55%, 20초마다 적이 2.5초간 정지' } },
   lightning:{ name:'번개',       icon:'lightning', desc: l => l===0 ? '하늘에서 적에게 번개가 내리친다' : '번개 횟수·피해·범위 증가',
@@ -762,7 +768,7 @@ function update(dt) {
   P.hurtT -= dt; P.inv -= dt;
   if (lvl('boots') >= 7) { P.trailT -= dt; if (P.trailT <= 0) { P.trailT = 0.04; P.trail.unshift({ x:P.x, y:P.y, face:P.face }); if (P.trail.length > 6) P.trail.pop(); } } else P.trail.length = 0;
   if (lvl('heart') >= 7 && Math.random() < dt * 3) particles.push({ x:P.x + rand(-22,22), y:P.y, vx:0, vy:-45, t:0.8, c:'#ff7ab0' });
-  if (lvl('heart') >= 7) P.hp = Math.min(P.maxHp, P.hp + 2*dt);
+  if (lvl('heart') >= 7) P.hp = Math.min(P.maxHp, P.hp + 5*dt);
   cam.x += (P.x - cam.x) * Math.min(1, dt*8); cam.y += (P.y - cam.y) * Math.min(1, dt*8);
   if (banner > 0) banner -= dt;
 
@@ -2097,6 +2103,44 @@ function drawWin() {
   button('다시 시작 [R]', W/2 - 170, H/2 + 105, 160, 46, start, '#2f9e5b');
   button('상점 [S]', W/2 + 10, H/2 + 105, 160, 46, openShop, '#e0932b');
 }
+const VERSION = '1.1.0';
+const CHANGELOG = [
+  { v:'1.1.0', date:'2026-11-25', items:[
+    '버전 기록 추가 (시작 화면 오른쪽 아래 "버전 기록" 버튼)',
+    '불사의 심장(체력 증가 최대 레벨) 재생 초당 2 → 초당 5',
+  ] },
+  { v:'1.0.1', date:'2026-11-25', items:[
+    '보스 출현 방식 변경: 첫 보스 3분, 이후 보스 처치 5분 뒤 다음 보스 (동시에 나오지 않음)',
+    '거미 여왕 약화 (체력, 탄 피해, 나선 탄막·졸개 소환 감소)',
+    '중반 적 체력 증가폭 완화, 엘리트 체력 3배 → 2.5배',
+  ] },
+  { v:'1.0.0', date:'2026-11-24', items:[
+    '첫 공개: 탕탕 서바이버 (스킬 19종 + 7레벨 진화, 보스 5종, 최종 보스 처치 시 클리어)',
+    '골드/상점(장비, 스킬 확률, 캐릭터 6종), 50골드 부활, 일시정지(Esc), 스킬 설명 보기',
+  ] },
+];
+let clScroll = 0, clMax = 0;
+function drawChangelog() {
+  ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
+  text('버전 기록', W/2, 60, 40, '#ffd54a');
+  text('현재 버전 v' + VERSION, W/2, 88, 15, '#ccc');
+  const cw = Math.min(640, W - 40), x = W/2 - cw/2, v0 = 110, v1 = H - 70;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, v0, W, v1 - v0); ctx.clip();
+  let y = v0 + 24 - clScroll;
+  for (const c of CHANGELOG) {
+    text('v' + c.v, x, y, 22, '#ffd54a', 'left'); text(c.date, x + cw, y, 14, '#9fb3c8', 'right'); y += 10;
+    for (const it of c.items) y = wrapText('• ' + it, x + 8, y + 18, cw - 16, 20, '#e6edf7');
+    y += 28;
+  }
+  ctx.restore();
+  clMax = Math.max(0, y + clScroll - v1 + 10 - v0);
+  clScroll = Math.max(0, Math.min(clMax, clScroll));
+  if (clMax > 0) {
+    const th = Math.max(30, (v1 - v0) * (v1 - v0) / (clMax + v1 - v0)), ty = v0 + (v1 - v0 - th) * (clScroll / clMax);
+    ctx.fillStyle = '#ffffff22'; ctx.fillRect(W - 12, v0, 6, v1 - v0); ctx.fillStyle = '#ffd54acc'; ctx.fillRect(W - 12, ty, 6, th);
+  }
+  button('닫기 [Esc]', W/2 - 80, H - 56, 160, 42, () => { state = 'title'; }, '#475569');
+}
 function drawPause() {
   ctx.fillStyle = '#000a'; ctx.fillRect(0, 0, W, H);
   text('일시정지', W/2, H/2 - 70, 46, '#ffd54a');
@@ -2125,6 +2169,8 @@ function drawTitle() {
   button('시작 [Enter]', W/2 - 170, H/2 + 85, 160, 48, start, '#2f9e5b');
   button('상점 [S]', W/2 + 10, H/2 + 85, 160, 48, openShop, '#e0932b');
   icon(charIcon(), W/2, H/2 + 200, 64);
+  text('v' + VERSION, 14, H - 16, 14, '#ffffffaa', 'left');
+  button('버전 기록', W - 190, H - 56, 170, 40, () => { state = 'changelog'; clScroll = 0; }, '#475569');
 }
 
 // ---------- 루프 ----------
@@ -2134,6 +2180,7 @@ function loop(now) {
   btns = [];
   if (state === 'title') drawTitle();
   else if (state === 'shop') drawShop();
+  else if (state === 'changelog') drawChangelog();
   else {
     if (state === 'play') update(dt);
     drawWorld(); drawHUD();
