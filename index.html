@@ -50,10 +50,12 @@ cv.addEventListener('click', e => {
   if (state === 'levelup') {
     cardRects.forEach((r,i) => { if (e.clientX>=r.x && e.clientX<=r.x+r.w && e.clientY>=r.y && e.clientY<=r.y+r.h) pick(i); });
   } else if (state === 'info') {
-    state = infoFrom;
+    const hit = btns.find(b => e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h);
+    if (hit) hit.fn();
+    else if (!infoCard || e.clientX < infoCard.x || e.clientX > infoCard.x + infoCard.w || e.clientY < infoCard.y || e.clientY > infoCard.y + infoCard.h) state = infoFrom;
   } else if (state === 'play' || state === 'pause') {
     const h = hudRects.find(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
-    if (h) { infoKey = h.k; infoFrom = state; state = 'info'; }
+    if (h) { infoKey = h.k; infoSel = Math.max(1, P.w[h.k]); infoFrom = state; state = 'info'; }
     else if (state === 'pause') for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
   } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog') {
     for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
@@ -2075,36 +2077,98 @@ function wrapText(str, x, y, maxW, lh, col) {
   }
   ctx.fillText(line, x, y); return y + lh;
 }
+// [라벨, 값, 단위]  단위: 'dmg'(피해: 보정 반영) / 'cd'(쿨타임: 쿨감 반영) / 그 외 접미사
+const SKILL_STATS = {
+  kunai:    l => l >= 7 ? [['개수', 12, '개'], ['피해', 40, 'dmg'], ['쿨타임', 0.55, 'cd'], ['관통', 3, '회']]
+                          : [['개수', l, '개'], ['피해', 10 + 2*l, 'dmg'], ['쿨타임', Math.max(0.3, 0.9 - 0.08*l), 'cd'], ['관통', l >= 3 ? 1 : 0, '회']],
+  shuriken: l => l >= 7 ? [['개수', 6, '개'], ['피해', 70, 'dmg'], ['사거리', 330, ''], ['크기', 38, ''], ['쿨타임', 2.6, 'cd']]
+                          : [['개수', l, '개'], ['피해', 14 + 4*l, 'dmg'], ['사거리', 130 + 32*l, ''], ['크기', 14 + 2.5*l, ''], ['쿨타임', 2.2 - 0.12*l, 'cd']],
+  shield:   l => [['범위(반경)', l >= 7 ? 340 : 60 + 30*l, ''], ['적 둔화', l >= 7 ? 65 : 25 + 5*l, '%'], ['피해(0.4초마다)', l >= 7 ? 45 : 6 + 5*l, 'dmg'], ['받는 피해 감소', 50, '%']],
+  guardian: l => l >= 7 ? [['개수', 6, '개'], ['피해', 60, 'dmg'], ['회전속도', 6.5, ''], ['크기', 27, ''], ['궤도 반경', 115, '']]
+                          : [['개수', l, '개'], ['피해', 20 + 6*l, 'dmg'], ['회전속도', 3 + 0.3*l, ''], ['크기', 11 + l, ''], ['궤도 반경', 70 + 3*l, '']],
+  molotov:  l => [['던지는 개수', l >= 7 ? 3 : l >= 4 ? 2 : 1, '개'], ['불바다 반경', l >= 7 ? 210 : 70 + 12*l, ''], ['지속시간', l >= 7 ? 5 : 3, '초'], ['피해(0.3초마다)', l >= 7 ? 60 : 12 + 6*l, 'dmg'], ['쿨타임', l >= 7 ? 1.3 : 2.4 - 0.2*l, 'cd']],
+  rocket:   l => [['발수', l >= 7 ? 7 : l, '발'], ['피해', l >= 7 ? 180 : 50 + 20*l, 'dmg'], ['폭발 반경', l >= 7 ? 140 : 70 + 10*l, ''], ['쿨타임', l >= 7 ? 1.6 : 2.8 - 0.2*l, 'cd']],
+  drone:    l => [['드론 수', l >= 7 ? 6 : l, '기'], ['드론당 탄 수', l >= 7 ? 3 : 1 + Math.floor(l/2), '발'], ['피해', l >= 7 ? 40 : 9 + 3*l, 'dmg'], ['연사 간격', l >= 7 ? 0.2 : Math.max(0.2, 0.75 - 0.09*l), 'cd'], ['관통', l >= 7 ? 3 : 0, '회']],
+  boots:    l => l >= 7 ? [['이동속도', 220, '%'], ['접촉 피해(0.2초마다)', 20, 'dmg']] : [['이동속도', 100 + 12*l, '%']],
+  scroll:   l => l >= 7 ? [['경험치 획득', 300, '%'], ['보석 흡수 범위', '+320']] : [['경험치 획득', 100 + 20*l, '%']],
+  heart:    l => [['최대 체력 증가', l >= 7 ? 800 : 100*l, ''], ['재생', l >= 7 ? 5 : 0, '/초'], ['부활', l >= 7 ? '1회' : '-']],
+  clock:    l => l >= 7 ? [['쿨타임 감소', 55, '%'], ['시간 정지', '20초마다 2.5초']] : [['쿨타임 감소', 7*l, '%']],
+  lightning:l => [['번개 수', l >= 7 ? 8 : 1 + Math.floor(l/2), '줄기'], ['피해', l >= 7 ? 150 : 30 + 12*l, 'dmg'], ['범위', l >= 7 ? 90 : 45 + 5*l, ''], ['쿨타임', l >= 7 ? 1.4 : 2.4 - 0.18*l, 'cd']],
+  summoner: l => [['정령 수', l >= 7 ? '6 + 골렘' : l, l >= 7 ? '' : '기'], ['정령 피해(기본)', l >= 7 ? 45 : 14 + 6*l, 'dmg'], ['이동속도', l >= 7 ? 230 : 150 + 10*l, ''], ['범위 공격', l >= 3 ? '있음 (반경 ' + (55 + 6*l) + '~)' : '없음']],
+  laser:    l => [['빔 수', l >= 7 ? 4 : l >= 4 ? 2 : 1, '줄기'], ['피해(0.12초마다)', l >= 7 ? 70 : 22 + 9*l, 'dmg'], ['굵기', l >= 7 ? 44 : 12 + 3*l, ''], ['지속', l >= 7 ? 2.8 : 0.5, '초'], ['쿨타임', l >= 7 ? 5 : 3.4 - 0.22*l, 'cd']],
+  brick:    l => [['개수', l >= 7 ? 4 : 1 + Math.ceil(l/2), '개'], ['피해', l >= 7 ? 220 : 35 + 14*l, 'dmg'], ['폭발 반경', l >= 7 ? 115 : 40 + 5*l, ''], ['쿨타임', l >= 7 ? 2 : 2.8 - 0.22*l, 'cd']],
+  drill:    l => [['드릴 수', l >= 7 ? 6 : l, '개'], ['피해(0.25초마다)', l >= 7 ? 60 : 12 + 5*l, 'dmg'], ['크기', l >= 7 ? 34 : 14 + 1.5*l, ''], ['충격파', l >= 7 ? '튕길 때 폭발' : '-']],
+  soccer:   l => [['공 수', l >= 7 ? 3 : l, '개'], ['피해', l >= 7 ? 90 : 15 + 6*l, 'dmg'], ['튕김 횟수', l >= 7 ? 15 : 3 + l, '회'], ['크기', l >= 7 ? 34 : 11 + 2.5*l, ''], ['쿨타임', l >= 7 ? 2.2 : 2.6 - 0.18*l, 'cd']],
+  magnet:   l => l >= 7 ? [['보석 흡수 범위', 700, ''], ['드롭 중 자석 비율', 90, '%'], ['고기/자석 드롭 간격', 35, '%']]
+                          : [['보석 흡수 범위 증가', 25*l, '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
+  dmgup:    l => [['모든 공격력 증가', 5*l, '%']],
+};
+const fmtN = v => String(Math.round(v * 100) / 100);
+const dmgMulNow = () => (1 + 0.05 * upLv('power')) * (1 + 0.05 * P.w.dmgup);
+function fmtStat(r, base) {
+  const v = r[1], unit = r[2];
+  if (typeof v === 'string') return v + (unit || '');
+  if (unit === 'dmg') return fmtN(base ? v : v * dmgMulNow());
+  if (unit === 'cd') return fmtN(base ? v : v * cdMul()) + '초';
+  return fmtN(v) + (unit || '');
+}
+let infoSel = 1, infoCard = null;
+function statGrid(rows, prev, base, x, y, cw) {            // 2열 표시, 이전 레벨 대비 증감 표시
+  const colW = (cw - 16) / 2;
+  rows.forEach((r, i) => {
+    const cx = x + (i % 2) * colW, cy = y + Math.floor(i / 2) * 24;
+    ctx.font = '13px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#9fb3c8'; ctx.fillText(r[0], cx, cy);
+    const val = fmtStat(r, base);
+    text(val, cx + colW - 14, cy, 14, '#fff', 'right');
+    const pr = prev && prev[i];
+    if (pr && typeof r[1] === 'number' && typeof pr[1] === 'number' && Math.abs(r[1] - pr[1]) > 1e-9) {
+      const d = r[1] - pr[1]; ctx.font = '11px sans-serif'; ctx.fillStyle = '#9fe29f'; ctx.textAlign = 'right';
+      ctx.fillText('(' + (d > 0 ? '+' : '') + fmtN(d) + ')', cx + colW - 14, cy + 11);
+    }
+  });
+  return y + Math.ceil(rows.length / 2) * 26;
+}
 function drawInfo() {
   ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
-  const k = infoKey, u = UPGRADES[k], lv = P.w[k], evo = lv >= MAXLV && !!u.evo;
-  const cw = Math.min(500, W - 40), x = W/2 - cw/2, y = H/2 - 170, ch = 340;
+  const k = infoKey, u = UPGRADES[k], lv = P.w[k], evo = lv >= MAXLV && !!u.evo, fn = SKILL_STATS[k];
+  const cw = Math.min(640, W - 24), ch = Math.min(H - 20, 600), x = W/2 - cw/2, y = H/2 - ch/2;
+  infoCard = { x, y, w:cw, h:ch };
   ctx.fillStyle = evo ? '#4a3a1a' : '#26304a'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 14); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#ffffff14'; ctx.beginPath(); ctx.arc(x + 62, y + 62, 40, 0, 7); ctx.fill();
-  icon(evo ? u.evo.icon : u.icon, x + 62, y + 62, 56);
-  text(evo ? u.evo.name : u.name, x + 118, y + 52, 26, evo ? '#ffd54a' : '#fff', 'left');
-  text(evo ? 'MAX (진화)' : u.evo ? 'Lv ' + lv + ' / ' + MAXLV : 'Lv ' + lv, x + 118, y + 80, 15, '#ffd54a', 'left');
-  let yy = y + 120;
-  yy = wrapText('기본 효과: ' + u.desc(0), x + 24, yy, cw - 48, 20, '#e6edf7') + 6;
-  if (!evo) yy = wrapText(lv === 6 && u.evo ? '다음 레벨: 진화 → ' + u.evo.name : '레벨업 시: ' + u.desc(1), x + 24, yy, cw - 48, 20, '#9fe29f') + 6;
-  if (u.evo) yy = wrapText((evo ? '진화 효과: ' : '7레벨 진화 [' + u.evo.name + ']: ') + u.evo.desc, x + 24, yy, cw - 48, 20, '#ffd54a');
-  else wrapText('스킬 5개를 MAX(7레벨)로 만들면 등장하며, 레벨 제한이 없습니다.', x + 24, yy, cw - 48, 20, '#ffd54a');
-  text('클릭하거나 Esc로 닫기', W/2, y + ch - 16, 14, '#aab', 'center');
+  ctx.fillStyle = '#ffffff14'; ctx.beginPath(); ctx.arc(x + 54, y + 56, 36, 0, 7); ctx.fill();
+  icon(evo ? u.evo.icon : u.icon, x + 54, y + 56, 52);
+  text(evo ? u.evo.name : u.name, x + 106, y + 48, 24, evo ? '#ffd54a' : '#fff', 'left');
+  text(evo ? 'MAX (진화)' : u.evo ? 'Lv ' + lv + ' / ' + MAXLV : 'Lv ' + lv, x + 106, y + 74, 15, '#ffd54a', 'left');
+  let yy = y + 112;
+  // 현재 능력치 (공격력/쿨타임 보정 반영)
+  text('현재 능력치', x + 22, yy, 15, '#ffd54a', 'left'); text('(상점·공격력 강화·쿨타임 감소 반영)', x + 120, yy, 11, '#8fa3b8', 'left');
+  yy = statGrid(fn(Math.max(1, lv)), null, false, x + 22, yy + 24, cw - 44) + 4;
+  yy = wrapText('기본 효과: ' + u.desc(0), x + 22, yy + 4, cw - 44, 19, '#e6edf7');
+  if (u.evo) yy = wrapText('7레벨 진화 [' + u.evo.name + ']: ' + u.evo.desc, x + 22, yy + 2, cw - 44, 19, '#ffd54a');
+  // 레벨별 세부 능력치 버튼
+  yy += 10;
+  text('레벨별 세부 능력치', x + 22, yy, 15, '#ffd54a', 'left');
+  const nLv = u.evo ? 7 : Math.max(5, lv + 1), gap = 6, bw = Math.min(70, (cw - 44 - gap * (nLv - 1)) / nLv), by = yy + 10;
+  for (let n = 1; n <= nLv; n++) {
+    const bx = x + 22 + (n - 1) * (bw + gap), sel = infoSel === n, reach = n <= lv;
+    ctx.fillStyle = sel ? '#e0932b' : reach ? '#3a4f73' : '#2a3550'; ctx.beginPath(); ctx.roundRect(bx, by, bw, 30, 7); ctx.fill();
+    if (n === lv) { ctx.strokeStyle = '#9fe29f'; ctx.lineWidth = 2; ctx.stroke(); }
+    text(u.evo && n === 7 ? '진화' : 'Lv' + n, bx + bw/2, by + 20, 13, reach || sel ? '#fff' : '#8fa3b8');
+    btns.push({ x:bx, y:by, w:bw, h:30, fn:() => { infoSel = n; } });
+  }
+  yy = by + 52;
+  const sn = Math.min(infoSel, nLv);
+  text((u.evo && sn === 7 ? '진화 (' + u.evo.name + ')' : 'Lv ' + sn) + ' 능력치 (기본값)', x + 22, yy, 14, '#fff', 'left');
+  if (sn > lv) text('아직 도달하지 않은 레벨', x + cw - 22, yy, 12, '#e5a24a', 'right');
+  statGrid(fn(sn), sn > 1 ? fn(sn - 1) : null, true, x + 22, yy + 24, cw - 44);
+  text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-function drawWin() {
-  ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
-  text('VICTORY!', W/2, H/2 - 80, 62, '#ffd54a');
-  text('죽음의 군주를 쓰러뜨렸습니다!', W/2, H/2 - 40, 22);
-  const m = Math.floor(time/60), s2 = Math.floor(time%60);
-  text('클리어 시간 ' + m + '분 ' + s2 + '초  ·  처치 ' + kills + '  ·  Lv.' + P.level, W/2, H/2, 20, '#ccc');
-  icon('coin', W/2 - 80, H/2 + 42, 24); text('+' + (P.earned || 0) + ' 골드 (클리어 보너스 +1000)', W/2 - 62, H/2 + 50, 18, '#ffd54a', 'left');
-  text('보유 골드 ' + SAVE.gold, W/2, H/2 + 82, 15, '#ccc');
-  button('다시 시작 [R]', W/2 - 170, H/2 + 105, 160, 46, start, '#2f9e5b');
-  button('상점 [S]', W/2 + 10, H/2 + 105, 160, 46, openShop, '#e0932b');
-}
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const CHANGELOG = [
+  { v:'1.2.0', date:'2026-11-25', items:[
+    '스킬 아이콘을 누르면 현재 레벨의 피해·쿨타임·개수 등 능력치를 표시',
+    '설명창 안의 레벨별 세부 능력치 버튼(Lv1~진화)으로 각 레벨의 수치와 증감 확인',
+  ] },
   { v:'1.1.0', date:'2026-11-25', items:[
     '버전 기록 추가 (시작 화면 오른쪽 아래 "버전 기록" 버튼)',
     '불사의 심장(체력 증가 최대 레벨) 재생 초당 2 → 초당 5',
