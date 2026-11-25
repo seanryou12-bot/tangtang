@@ -204,14 +204,14 @@ function spawnEnemy(type, at) {
   const late = Math.max(0, time - 240);   // 4분까지는 체력 증가 없음 (이후 후반일수록 가파르게 강해짐)
   const big = type === 'brute' || type === 'titan' || type === 'warlord' || type === 'colossus';
   const pw = Math.max(0, powerLv() - 15);   // 스킬을 많이 모을수록 적도 단단해짐
-  const scale = (big ? 1 + late / 70 + (late / 400) ** 2 : 1 + late / 140 + (late / 380) ** 2) * (1 + 0.025 * pw);
+  const scale = (big ? 1 + late / 110 + (late / 450) ** 2 : 1 + late / 220 + (late / 450) ** 2) * (1 + 0.018 * pw);
   enemies.push({ type, x:p.x, y:p.y,
     hp:t.hp*scale, maxHp:t.hp*scale, speed:t.speed*(1+Math.min(Math.max(0, time - 120)/350, 0.8)) * rand(.9,1.1),
     dmg:t.dmg * (1 + Math.max(0, time - 180) / 130) * (1 + 0.01 * pw), r:t.r, size:t.size, icon:t.icon, gem:t.gem,
     flash:0, hitCd:0, gHit:0, kx:0, ky:0, kbMul:1, ranged:t.ranged, fireT:rand(3,6) });
   if (!big && Math.random() < Math.min(0.3, Math.max(0, time - 180) / 1500)) {   // 3분~: 엘리트 (체력 3배)
     const en = enemies[enemies.length - 1];
-    en.elite = true; en.hp *= 3; en.maxHp *= 3; en.dmg *= 1.3; en.size *= 1.15; en.r *= 1.1; en.gem *= 2;
+    en.elite = true; en.hp *= 2.5; en.maxHp *= 2.5; en.dmg *= 1.3; en.size *= 1.15; en.r *= 1.1; en.gem *= 2;
   }
 }
 const BOSS_KITS = [
@@ -223,13 +223,13 @@ const BOSS_KITS = [
 ];
 function spawnBoss(idx) {
   const b = BOSSES[idx - 1], p = ringPos(80);
-  const pw = Math.max(0, powerLv() - 10), hp = 25000 * (1 + 1.0 * (idx - 1)) * (1 + 0.04 * pw);   // 스킬이 많을수록 보스도 단단
+  const pw = Math.max(0, powerLv() - 10), hp = 25000 * [1.0, 1.3, 2.2, 3.0, 4.0][idx - 1] * (1 + 0.04 * pw);   // 스킬이 많을수록 보스도 단단
   enemies.push({ type:'boss', boss:true, final:idx === 5, kit:BOSS_KITS[idx - 1], name:b.name, idx, x:p.x, y:p.y, hp, maxHp:hp, speed:55 + idx*4,
     dmg:(30 + idx*8) * (1 + time / 300), r:48, size:120, icon:b.icon, gem:5, flash:0, hitCd:0, gHit:0, kx:0, ky:0, kbMul:0.05,
     atkT:3, dashT:0, windT:0, dx:0, dy:0, spiralT:0, spiralCd:0, spiralA:0 });
   bossT = 1e9; banner = 3; bannerTxt = idx === 5 ? '⚠ 최종 보스 : ' + b.name + ' ⚠' : '⚠ BOSS : ' + b.name + ' 출현! ⚠';
 }
-function bossShoot(e, a, spd) { ebullets.push({ x:e.x, y:e.y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:5, r:9, dmg:e.dmg*0.45 }); }
+function bossShoot(e, a, spd) { ebullets.push({ x:e.x, y:e.y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:5, r:9, dmg:e.dmg*(e.idx === 2 ? 0.3 : 0.45) }); }
 function bossAI(e, dt) {
   const enraged = e.hp < e.maxHp * 0.5;
   if (e.windT > 0) { e.windT -= dt; if (e.windT <= 0) e.dashT = 0.9; return true; }   // 예고 (붉은 경로)
@@ -250,7 +250,7 @@ function bossAI(e, dt) {
       const n = 3 + e.idx + (enraged ? 2 : 0);
       for (let i = 0; i < n; i++) bossShoot(e, aim + (i - (n - 1) / 2) * 0.16, 270);
     } else if (atk === 'spiral') {
-      e.spiralT = 2.2; e.spiralA = Math.random() * 6; e.spiralCd = 0;
+      e.spiralT = e.idx === 2 ? 1.5 : 2.2; e.spiralA = Math.random() * 6; e.spiralCd = 0;
     } else if (atk === 'dash') {
       e.dx = (P.x - e.x) / d; e.dy = (P.y - e.y) / d; e.windT = 0.9;
     } else if (atk === 'slam') {                             // 발구르기: 예고 원 → 범위 피해
@@ -262,7 +262,7 @@ function bossAI(e, dt) {
       }
     } else if (atk === 'summon') {                           // 졸개 소환
       const types = e.idx < 3 ? ['bug', 'dog'] : e.idx < 5 ? ['knight', 'wolf'] : ['reaper', 'knight'];
-      for (let i = 0; i < 5; i++) spawnEnemy(types[i % types.length], { x:e.x + rand(-130,130), y:e.y + rand(-130,130) });
+      for (let i = 0; i < (e.idx === 2 ? 3 : 5); i++) spawnEnemy(types[i % types.length], { x:e.x + rand(-130,130), y:e.y + rand(-130,130) });
       particles.push({ x:e.x, y:e.y, ring:150, t:0.4, tmax:0.4, c:'#a78bfa' });
     } else if (atk === 'blink') {                            // 순간이동 후 조준 사격
       particles.push({ x:e.x, y:e.y, ring:90, t:0.3, tmax:0.3, c:'#e879f9' });
