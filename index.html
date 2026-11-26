@@ -588,12 +588,12 @@ function updateMinions(dt) {
     } else if (kind === 'frog') {
       if (m.jt > 0) {                                          // 점프 중: 포물선 이동 후 착지 폭발
         m.jt -= dt; const p = 1 - Math.max(0, m.jt) / m.jT;
-        m.x = m.sx + (m.tx - m.sx)*p; m.y = m.sy + (m.ty - m.sy)*p; m.jh = Math.sin(Math.PI * p) * 46;
+        m.x = m.sx + (m.jx - m.sx)*p; m.y = m.sy + (m.jy - m.sy)*p; m.jh = Math.sin(Math.PI * p) * 46;
         if (m.jt <= 0) { m.jh = 0; m.cdT = 0.45; explode(m.x, m.y, sp.aoe, sp.dmg * 1.6, '#4ade80');
           for (let i = 0; i < 8; i++) particles.push({ x:m.x, y:m.y, vx:rand(-120,120), vy:rand(-120,120), t:0.3, c:'#86efac' }); }
       } else if (tg && m.cdT <= 0) {
         const d = Math.hypot(tg.x - m.x, tg.y - m.y) || 1, j = Math.min(d, sp.spd * 0.9);
-        m.sx = m.x; m.sy = m.y; m.tx = m.x + (tg.x - m.x)/d*j; m.ty = m.y + (tg.y - m.y)/d*j; m.jT = m.jt = 0.55; m.face = tg.x >= m.x ? 1 : -1;
+        m.sx = m.x; m.sy = m.y; m.jx = m.x + (tg.x - m.x)/d*j; m.jy = m.y + (tg.y - m.y)/d*j; m.jT = m.jt = 0.55; m.face = tg.x >= m.x ? 1 : -1;
       } else if (!tg) idle();
     } else if (kind === 'eagle') {                              // 비행 + 관통 돌진
       m.hits = m.hits || new Map();
@@ -2298,8 +2298,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const CHANGELOG = [
+  { v:'1.5.1', date:'2026-11-26', items:[
+    '소환사 개구리가 점프하지 않던 버그 수정',
+  ] },
   { v:'1.5.0', date:'2026-11-26', items:[
     '소환사 정령 개편: 정령 순서 유령→개구리→독수리→슬라임→말 탄 기사→드래곤, 뒤에 얻을수록 피해·속도 증가',
     '개구리: 점프 후 착지 지점 범위 피해 / 독수리: 매우 빠른 관통 돌진 / 슬라임: 10초마다 분열(최대 8마리)',
