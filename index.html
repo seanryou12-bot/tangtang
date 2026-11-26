@@ -114,8 +114,8 @@ const UPGRADES = {
               evo:{ name:'시간 정지',   icon:'hourglass', desc:'쿨타임 -55%, 20초마다 적이 2.5초간 정지' } },
   lightning:{ name:'번개',       icon:'lightning', desc: l => l===0 ? '하늘에서 적에게 번개가 내리친다' : '번개 횟수·피해·범위 증가',
               evo:{ name:'뇌신의 심판', icon:'lightningEvo', desc:'번개 8줄기가 폭풍처럼 쏟아진다' } },
-  summoner: { name:'소환자',     icon:'summon', desc: l => l===0 ? '유령 정령을 소환해 적을 공격한다' : '새 정령 +1 (개구리→슬라임→독수리→말 탄 기사→드래곤), 3레벨부터 범위 공격',
-              evo:{ name:'소환왕',     icon:'summonEvo', desc:'6종 정령이 모두 강화되고 거대 골렘이 합류한다' } },
+  summoner: { name:'소환자',     icon:'summon', desc: l => l===0 ? '유령 정령을 소환해 적을 공격한다' : '새 정령 +1 (개구리→독수리→슬라임→말 탄 기사→드래곤), 뒤에 얻는 정령일수록 피해·속도 증가',
+              evo:{ name:'소환왕',     icon:'summonEvo', desc:'6종 정령이 모두 강화되고 압도적인 피해와 범위의 거대 골렘이 합류한다' } },
   laser:    { name:'레이저',     icon:'laser', desc: l => l===0 ? '모든 것을 꿰뚫는 레이저를 발사한다' : '레이저 굵기·피해 증가, 4레벨부터 2줄기',
               evo:{ name:'회전 레이저', icon:'laserEvo', desc:'4갈래 레이저가 회전하며 주변을 불태운다' } },
   brick:    { name:'벽돌',       icon:'brick', desc: l => l===0 ? '벽돌을 던져 적 위로 떨어뜨린다' : '벽돌 개수·범위·피해 증가',
@@ -552,41 +552,113 @@ function updateLasers(dt) {
   }
   lasers = lasers.filter(l => l.t > 0);
 }
-const MINION_TYPES = [          // 스킬 레벨 1~6: 유령, 개구리, 슬라임, 독수리, 말 탄 기사, 드래곤
-  { name:'유령', icon:'spirit',      r:12, spd:1.0,  dmg:1.0, aoe:1.0, fly:0 },
-  { name:'개구리', icon:'frog',        r:12, spd:1.15, dmg:1.0, aoe:1.0, fly:0 },
-  { name:'슬라임', icon:'slimeM',      r:13, spd:0.9,  dmg:1.1, aoe:1.2, fly:0 },
-  { name:'독수리', icon:'eagle',       r:13, spd:1.6,  dmg:1.2, aoe:0.9, fly:1 },
-  { name:'말 탄 기사', icon:'horseKnight', r:18, spd:1.3,  dmg:1.8, aoe:1.3, fly:0 },
-  { name:'드래곤', icon:'dragonM',     r:24, spd:1.0,  dmg:2.5, aoe:1.8, fly:0 },
+const MINION_TYPES = [          // 스킬 레벨 1~6: 유령, 개구리, 독수리, 슬라임, 말 탄 기사, 드래곤 (뒤에 얻을수록 피해·속도 상승)
+  { name:'유령',      icon:'spirit',      r:12, spd:1.0,  dmg:1.0, aoe:1.0, fly:0, kind:'ghost',  info:'적에게 붙어 공격, 3레벨부터 접촉 시 폭발' },
+  { name:'개구리',    icon:'frog',        r:12, spd:1.15, dmg:1.4, aoe:1.3, fly:0, kind:'frog',   info:'점프해서 착지한 곳에 범위 피해' },
+  { name:'독수리',    icon:'eagle',       r:13, spd:3.4,  dmg:1.7, aoe:1.0, fly:1, kind:'eagle',  info:'매우 빠르게 날아다니며 적을 관통 공격' },
+  { name:'슬라임',    icon:'slimeM',      r:13, spd:1.3,  dmg:2.1, aoe:1.4, fly:0, kind:'slime',  info:'10초마다 둘로 분열 (동시에 최대 8마리)' },
+  { name:'말 탄 기사', icon:'horseKnight', r:18, spd:1.6,  dmg:3.0, aoe:1.3, fly:0, kind:'knight', info:'적 사이를 돌진하며 직선으로 베기' },
+  { name:'드래곤',    icon:'dragonM',     r:24, spd:1.8,  dmg:4.0, aoe:1.8, fly:0, kind:'dragon', info:'불을 뿜는 광범위 부채꼴 공격' },
 ];
+const GOLEM_TYPE = { name:'거대 골렘', icon:'golem', r:34, spd:1, dmg:1, aoe:1, fly:0, kind:'golem', info:'압도적인 피해와 범위의 대지 강타' };
+const typesFor = l => l >= 7 ? [GOLEM_TYPE, ...MINION_TYPES] : MINION_TYPES.slice(0, l);
+function spiritSpec(l, ty) {
+  if (ty.kind === 'golem') return { dmg:360, spd:130, aoe:280, range:0 };
+  const baseDmg = l >= 7 ? 45 : 14 + 6*l, baseSpd = l >= 7 ? 230 : 150 + 10*l;
+  return { dmg:baseDmg * ty.dmg, spd:baseSpd * ty.spd, aoe:(55 + 6*Math.min(l, 6)) * ty.aoe, range:230 + 12*Math.min(l, 7) };
+}
 function updateMinions(dt) {
   const l = lvl('summoner');
   if (!l) { minions = []; return; }
-  const evo = l >= 7, n = evo ? 7 : l;
-  while (minions.length < n) minions.push({ x:P.x + rand(-40,40), y:P.y + rand(-40,40), face:1 });
-  while (minions.length > n) minions.pop();
-  for (const e of enemies) e.mHit = (e.mHit || 0) - dt;
-  minions.forEach((m, i) => {
-    const golem = evo && i === 0, ty = MINION_TYPES[Math.min(golem ? 0 : evo ? i - 1 : i, 5)];
-    const baseDmg = golem ? 90 : evo ? 45 : 14 + l*6, baseSpd = golem ? 120 : evo ? 230 : 150 + l*10;
-    const spec = { dmg:baseDmg * (golem ? 1 : ty.dmg), spd:baseSpd * (golem ? 1 : ty.spd), r:golem ? 34 : ty.r };
-    m.golem = golem; m.ty = ty; m.r = spec.r;
-    const tg = nearest(m, enemies, 420);
-    let tx, ty2;
-    if (tg) { tx = tg.x; ty2 = tg.y; } else { const a = time*1.2 + i*2.1; tx = P.x + Math.cos(a)*75; ty2 = P.y + Math.sin(a)*75; }
-    const d = Math.hypot(tx - m.x, ty2 - m.y) || 1, v = tg ? spec.spd : Math.min(300, d*3 + 60);
-    if (d > 4) { m.x += (tx - m.x)/d*v*dt; m.y += (ty2 - m.y)/d*v*dt; }
-    m.face = tx >= m.x ? 1 : -1;
-    m.aoeT = (m.aoeT || 0) - dt;
-    if (l >= 3) {                                   // 3레벨부터: 닿으면 주변 범위 폭발
-      if (m.aoeT <= 0 && enemies.some(e => dist2(m, e) < (m.r + e.r + 6)**2)) {
-        m.aoeT = 0.6; explode(m.x, m.y, golem ? 130 : (55 + l*6) * ty.aoe, spec.dmg, golem ? '#38bdf8' : '#a78bfa');
+  const types = typesFor(l);
+  for (let i = 0; i < types.length; i++) if (!minions.some(m => !m.clone && m.idx === i)) minions.push({ idx:i, x:P.x + rand(-40,40), y:P.y + rand(-40,40), face:1, ty:types[i], r:types[i].r, ph:rand(0, 6.28) });
+  minions = minions.filter(m => m.clone || m.idx < types.length);
+  const steer = (m, tx, ty, v) => { const d = Math.hypot(tx - m.x, ty - m.y) || 1; if (d > 4) { m.x += (tx - m.x)/d*v*dt; m.y += (ty - m.y)/d*v*dt; } m.face = tx >= m.x ? 1 : -1; };
+  for (const m of [...minions]) {
+    const ty = m.ty = m.clone ? m.ty : types[m.idx], kind = ty.kind, sp = spiritSpec(l, ty); m.r = ty.r;
+    m.aoeT = (m.aoeT || 0) - dt; m.cdT = (m.cdT || 0) - dt;
+    const tg = nearest(m, enemies, kind === 'eagle' ? 650 : 430);
+    const oa = time*1.2 + (m.idx || 0)*2.1 + (m.ph || 0), ox = P.x + Math.cos(oa)*75, oy = P.y + Math.sin(oa)*75;
+    const idle = () => steer(m, ox, oy, Math.min(300, Math.hypot(ox - m.x, oy - m.y)*3 + 60));
+    const touch = e => dist2(m, e) < (m.r + e.r + 4)**2;
+    if (kind === 'ghost') {
+      if (tg) steer(m, tg.x, tg.y, sp.spd); else idle();
+      if (l >= 3) { if (m.aoeT <= 0 && enemies.some(touch)) { m.aoeT = 0.6; explode(m.x, m.y, sp.aoe, sp.dmg, '#a78bfa'); } }
+      else { m.hits = m.hits || new Map(); for (const e of enemies) if (touch(e) && time - (m.hits.get(e) || -9) > 0.5) { m.hits.set(e, time); damageEnemy(e, sp.dmg, (e.x - m.x)*3, (e.y - m.y)*3); } }
+    } else if (kind === 'frog') {
+      if (m.jt > 0) {                                          // 점프 중: 포물선 이동 후 착지 폭발
+        m.jt -= dt; const p = 1 - Math.max(0, m.jt) / m.jT;
+        m.x = m.sx + (m.tx - m.sx)*p; m.y = m.sy + (m.ty - m.sy)*p; m.jh = Math.sin(Math.PI * p) * 46;
+        if (m.jt <= 0) { m.jh = 0; m.cdT = 0.45; explode(m.x, m.y, sp.aoe, sp.dmg * 1.6, '#4ade80');
+          for (let i = 0; i < 8; i++) particles.push({ x:m.x, y:m.y, vx:rand(-120,120), vy:rand(-120,120), t:0.3, c:'#86efac' }); }
+      } else if (tg && m.cdT <= 0) {
+        const d = Math.hypot(tg.x - m.x, tg.y - m.y) || 1, j = Math.min(d, sp.spd * 0.9);
+        m.sx = m.x; m.sy = m.y; m.tx = m.x + (tg.x - m.x)/d*j; m.ty = m.y + (tg.y - m.y)/d*j; m.jT = m.jt = 0.55; m.face = tg.x >= m.x ? 1 : -1;
+      } else if (!tg) idle();
+    } else if (kind === 'eagle') {                              // 비행 + 관통 돌진
+      m.hits = m.hits || new Map();
+      const wx = tg ? tg.x : ox, wy = tg ? tg.y : oy, want = Math.atan2(wy - m.y, wx - m.x);
+      if (m.dir === undefined) m.dir = want;
+      let d = want - m.dir; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI;
+      m.dir += Math.max(-7*dt, Math.min(7*dt, d));
+      const v = tg ? sp.spd : Math.min(380, Math.hypot(ox - m.x, oy - m.y)*3 + 80);
+      m.x += Math.cos(m.dir)*v*dt; m.y += Math.sin(m.dir)*v*dt; m.face = Math.cos(m.dir) >= 0 ? 1 : -1;
+      for (const e of enemies) if (touch(e) && time - (m.hits.get(e) || -9) > 0.35) { m.hits.set(e, time); damageEnemy(e, sp.dmg, Math.cos(m.dir)*80, Math.sin(m.dir)*80); }
+      if (Math.random() < 0.6) particles.push({ x:m.x, y:m.y, vx:0, vy:0, t:0.2, c:'#bae6fd' });
+    } else if (kind === 'slime') {                              // 10초마다 분열 (최대 8마리)
+      if (tg) steer(m, tg.x, tg.y, sp.spd); else idle();
+      if (m.aoeT <= 0 && enemies.some(touch)) { m.aoeT = 0.6; explode(m.x, m.y, sp.aoe, sp.dmg, '#86efac'); }
+      m.splitT = (m.splitT === undefined ? 10 : m.splitT) - dt;
+      if (m.splitT <= 0) {
+        m.splitT = 10;
+        if (minions.filter(q => q.ty.kind === 'slime').length < 8) {
+          minions.push({ clone:true, ty:m.ty, idx:m.idx, x:m.x + rand(-12,12), y:m.y + rand(-12,12), face:m.face, r:m.r, ph:rand(0, 6.28), splitT:10 });
+          particles.push({ x:m.x, y:m.y, ring:34, t:0.3, tmax:0.3, c:'#86efac' });
+        }
       }
-    } else for (const e of enemies) if (e.mHit <= 0 && dist2(m, e) < (m.r + e.r)**2) {
-      damageEnemy(e, spec.dmg, (e.x - m.x)*3, (e.y - m.y)*3); e.mHit = 0.5;
+    } else if (kind === 'knight') {                             // 돌진: 예고 → 직선 돌파 → 휴식
+      m.st = m.st || 'chase';
+      if (m.st === 'chase') {
+        if (tg) { steer(m, tg.x, tg.y, sp.spd * 0.6);
+          if (m.cdT <= 0 && Math.hypot(tg.x - m.x, tg.y - m.y) < 380) { const d = Math.hypot(tg.x - m.x, tg.y - m.y) || 1; m.dx = (tg.x - m.x)/d; m.dy = (tg.y - m.y)/d; m.st = 'wind'; m.stT = 0.25; }
+        } else idle();
+      } else if (m.st === 'wind') {
+        m.stT -= dt; m.face = m.dx >= 0 ? 1 : -1;
+        if (m.stT <= 0) { m.st = 'dash'; m.stT = 0.5; m.hits = new Map(); }
+      } else {
+        m.stT -= dt; const v = Math.max(640, sp.spd * 2.6);
+        m.x += m.dx*v*dt; m.y += m.dy*v*dt;
+        for (const e of enemies) if (!m.hits.has(e) && dist2(m, e) < (m.r + e.r + 14)**2) { m.hits.set(e, 1); damageEnemy(e, sp.dmg * 1.6, m.dx*140, m.dy*140); }
+        particles.push({ x:m.x, y:m.y, vx:rand(-30,30), vy:rand(-30,30), t:0.3, c:'#fde68a' });
+        if (m.stT <= 0) { m.st = 'chase'; m.cdT = 1.2; }
+      }
+    } else if (kind === 'dragon') {                             // 화염 숨결: 부채꼴 광범위
+      if (m.bT > 0) {
+        m.bT -= dt; m.tick = (m.tick || 0) - dt;
+        if (tg) m.ba = Math.atan2(tg.y - m.y, tg.x - m.x);
+        m.face = Math.cos(m.ba) >= 0 ? 1 : -1;
+        if (m.tick <= 0) {
+          m.tick = 0.1;
+          for (const e of enemies) { const dx = e.x - m.x, dy = e.y - m.y, dd = Math.hypot(dx, dy);
+            if (dd < sp.range + e.r) { let da = Math.atan2(dy, dx) - m.ba; while (da > Math.PI) da -= 2*Math.PI; while (da < -Math.PI) da += 2*Math.PI;
+              if (Math.abs(da) < 0.6) damageEnemy(e, sp.dmg * 0.4, Math.cos(m.ba)*30, Math.sin(m.ba)*30); } }
+          for (let i = 0; i < 10; i++) { const a = m.ba + rand(-0.55, 0.55), v = rand(0.5, 1) * sp.range * 2.2;
+            particles.push({ x:m.x + Math.cos(m.ba)*20, y:m.y + Math.sin(m.ba)*20, vx:Math.cos(a)*v, vy:Math.sin(a)*v, t:0.35, c:['#ef4444','#fb923c','#fde047'][i % 3] }); }
+        }
+        if (m.bT <= 0) m.cdT = 1.4;
+      } else if (tg) {
+        const d = Math.hypot(tg.x - m.x, tg.y - m.y);
+        if (d > sp.range * 0.7) steer(m, tg.x, tg.y, sp.spd); else m.face = tg.x >= m.x ? 1 : -1;
+        if (m.cdT <= 0 && d < sp.range) { m.bT = 0.9; m.ba = Math.atan2(tg.y - m.y, tg.x - m.x); m.tick = 0; }
+      } else idle();
+    } else {                                                    // 거대 골렘: 대지 강타
+      if (tg) steer(m, tg.x, tg.y, sp.spd); else idle();
+      if (m.aoeT <= 0 && enemies.some(e => dist2(m, e) < (190 + e.r)**2)) {
+        m.aoeT = 1.0; explode(m.x, m.y, sp.aoe, sp.dmg, '#38bdf8');
+        particles.push({ x:m.x, y:m.y, ring:sp.aoe*0.6, t:0.4, tmax:0.4, c:'#e0f2fe' });
+      }
     }
-  });
+  }
 }
 
 function guardianSpec() {
@@ -1798,7 +1870,7 @@ function drawWorld() {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke();
   }
   // 소환수
-  for (const m of minions) { shadow(m.x, m.y + m.r, m.r); if (lvl('summoner') >= 7) { ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = m.golem ? 22 : 12; } icon(m.golem ? 'golem' : m.ty.icon, m.x, m.y + Math.sin(time*6 + m.x*.05)*2 - (m.ty.fly && !m.golem ? 14 : 0), m.r*2.4, m.face < 0); ctx.shadowBlur = 0; }
+  for (const m of minions) { shadow(m.x, m.y + m.r, m.r * (1 - (m.jh || 0) / 140)); if (lvl('summoner') >= 7) { ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = m.ty.kind === 'golem' ? 22 : 12; } icon(m.ty.icon, m.x, m.y + Math.sin(time*6 + m.x*.05)*2 - (m.ty.fly ? 14 : 0) - (m.jh || 0), m.r*2.4, m.face < 0); ctx.shadowBlur = 0; }
   // 드릴
   for (const p of drillList) {
     if (p.evo) { ctx.shadowColor = '#fb923c'; ctx.shadowBlur = 16; }
@@ -2136,7 +2208,7 @@ const SKILL_STATS = {
   heart:    l => [['최대 체력 증가', l >= 7 ? 800 : 100*l, ''], ['재생', l >= 7 ? 5 : 0, '/초'], ['부활', l >= 7 ? '1회' : '-']],
   clock:    l => l >= 7 ? [['쿨타임 감소', 55, '%'], ['시간 정지', '20초마다 2.5초']] : [['쿨타임 감소', 7*l, '%']],
   lightning:l => [['번개 수', l >= 7 ? 8 : 1 + Math.floor(l/2), '줄기'], ['피해', l >= 7 ? 150 : 30 + 12*l, 'dmg'], ['범위', l >= 7 ? 90 : 45 + 5*l, ''], ['쿨타임', l >= 7 ? 1.4 : 2.4 - 0.18*l, 'cd']],
-  summoner: l => [['정령 수', l >= 7 ? '6 + 골렘' : l, l >= 7 ? '' : '기'], ['정령 피해(기본)', l >= 7 ? 45 : 14 + 6*l, 'dmg'], ['이동속도', l >= 7 ? 230 : 150 + 10*l, ''], ['범위 공격', l >= 3 ? '있음 (반경 ' + (55 + 6*l) + '~)' : '없음']],
+  summoner: l => [['정령 수', l >= 7 ? '6 + 골렘' : l, l >= 7 ? '' : '기'], ['정령 피해(기본)', l >= 7 ? 45 : 14 + 6*l, 'dmg'], ['이동속도', l >= 7 ? 230 : 150 + 10*l, ''], ['정령별 능력', '아래 정령별 정보 참고']],
   laser:    l => [['빔 수', l >= 7 ? 4 : l >= 4 ? 2 : 1, '줄기'], ['피해(0.12초마다)', l >= 7 ? 70 : 22 + 9*l, 'dmg'], ['굵기', l >= 7 ? 44 : 12 + 3*l, ''], ['지속', l >= 7 ? 2.8 : 0.5, '초'], ['쿨타임', l >= 7 ? 5 : 3.4 - 0.22*l, 'cd']],
   brick:    l => [['개수', l >= 7 ? 4 : 1 + Math.ceil(l/2), '개'], ['피해', l >= 7 ? 220 : 35 + 14*l, 'dmg'], ['폭발 반경', l >= 7 ? 115 : 40 + 5*l, ''], ['쿨타임', l >= 7 ? 2 : 2.8 - 0.22*l, 'cd']],
   drill:    l => [['드릴 수', l >= 7 ? 6 : l, '개'], ['피해(0.25초마다)', l >= 7 ? 60 : 12 + 5*l, 'dmg'], ['크기', l >= 7 ? 34 : 14 + 1.5*l, ''], ['충격파', l >= 7 ? '튕길 때 폭발' : '-']],
@@ -2174,7 +2246,7 @@ function statGrid(rows, prev, base, x, y, cw) {            // 2열 표시, 이�
 function drawInfo() {
   ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
   const codex = infoFrom === 'codex', k = infoKey, u = UPGRADES[k], lv = codex ? 0 : P.w[k], evo = !codex && lv >= MAXLV && !!u.evo, fn = SKILL_STATS[k];
-  const cw = Math.min(640, W - 24), ch = Math.min(H - 20, k === 'summoner' ? 720 : 600), x = W/2 - cw/2, y = H/2 - ch/2;
+  const cw = Math.min(640, W - 24), ch = Math.min(H - 20, k === 'summoner' ? 860 : 600), x = W/2 - cw/2, y = H/2 - ch/2;
   infoCard = { x, y, w:cw, h:ch };
   ctx.fillStyle = evo ? '#4a3a1a' : '#26304a'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 14); ctx.fill(); ctx.stroke();
@@ -2213,22 +2285,26 @@ function drawInfo() {
   }
   if (k === 'summoner') {
     ge += 10; text('정령별 정보' + (live ? ' (현재 보정 반영)' : ' (기본값)'), x + 22, ge, 14, '#ffd54a', 'left'); ge += 8;
-    const mul = live ? dmgMulNow() : 1, ev = sn >= 7, list = [];
-    if (ev) list.push({ nm:'골렘', icon:'golem', dmg:90, spd:120, aoe:130 });
-    for (let i = 0; i < (ev ? 6 : sn); i++) { const ty = MINION_TYPES[i];
-      list.push({ nm:ty.name, icon:ty.icon, dmg:(ev ? 45 : 14 + 6*sn) * ty.dmg, spd:(ev ? 230 : 150 + 10*sn) * ty.spd, aoe:(55 + 6*Math.min(sn, 6)) * ty.aoe, unlock:i + 1 }); }
-    list.forEach((r, i) => {
-      const ry = ge + i * 30;
-      icon(r.icon, x + 40, ry + 12, 24);
-      text(r.nm + (r.unlock ? ' (Lv' + r.unlock + '~)' : ''), x + 62, ry + 16, 13, '#fff', 'left');
-      text('피해 ' + fmtN(r.dmg * mul) + ' · 속도 ' + fmtN(r.spd) + (sn >= 3 ? ' · 폭발 반경 ' + fmtN(r.aoe) : ' · 접촉 공격'), x + cw - 22, ry + 16, 12, '#cfd8e6', 'right');
+    const mul = live ? dmgMulNow() : 1, list = typesFor(sn);
+    list.forEach((ty, i) => {
+      const sp = spiritSpec(sn, ty), ry = ge + i * 40, k2 = ty.kind;
+      const ex = k2 === 'ghost' ? (sn >= 3 ? '폭발 반경 ' + fmtN(sp.aoe) : '접촉 공격') : k2 === 'frog' ? '착지 반경 ' + fmtN(sp.aoe) : k2 === 'eagle' ? '관통 돌진' : k2 === 'slime' ? '폭발 반경 ' + fmtN(sp.aoe) : k2 === 'knight' ? '돌진 거리 약 300' : k2 === 'dragon' ? '화염 사거리 ' + fmtN(sp.range) : '폭발 반경 ' + fmtN(sp.aoe);
+      icon(ty.icon, x + 40, ry + 14, 28);
+      text(ty.name + (k2 === 'golem' ? ' (진화)' : ' (Lv' + (sn >= 7 ? i : i + 1) + '~)'), x + 62, ry + 14, 13, '#fff', 'left');
+      text('피해 ' + fmtN(sp.dmg * mul * (k2 === 'dragon' ? 0.4 : 1)) + (k2 === 'dragon' ? '/틱' : '') + ' · 속도 ' + fmtN(sp.spd) + ' · ' + ex, x + cw - 22, ry + 14, 12, '#cfd8e6', 'right');
+      text(ty.info, x + 62, ry + 30, 11, '#9fb3c8', 'left');
     });
-    text('높은 레벨에서 얻는 정령일수록 피해·크기가 큽니다', x + 22, ge + list.length * 30 + 8, 12, '#9fb3c8', 'left');
+    text('뒤에 얻는 정령일수록 피해·속도가 높습니다 (독수리는 속도 예외적으로 최고)', x + 22, ge + list.length * 40 + 8, 12, '#9fb3c8', 'left');
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const CHANGELOG = [
+  { v:'1.5.0', date:'2026-11-26', items:[
+    '소환사 정령 개편: 정령 순서 유령→개구리→독수리→슬라임→말 탄 기사→드래곤, 뒤에 얻을수록 피해·속도 증가',
+    '개구리: 점프 후 착지 지점 범위 피해 / 독수리: 매우 빠른 관통 돌진 / 슬라임: 10초마다 분열(최대 8마리)',
+    '말 탄 기사: 적 사이를 직선 돌진 / 드래곤: 부채꼴 화염 숨결 / 거대 골렘: 압도적인 피해와 범위',
+  ] },
   { v:'1.4.0', date:'2026-11-26', items:[
     '상점 "전체 초기화" 버튼 추가 (확인 창 표시, 골드까지 모두 0으로)',
     '상점 가격 전체 5배 인상',
