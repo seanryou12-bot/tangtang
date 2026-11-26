@@ -42,6 +42,7 @@ addEventListener('keydown', e => {
   else if (k === 'escape' && state === 'play') state = 'pause';
   else if (k === 'escape' && state === 'pause') state = 'play';
   if (state === 'over' && k === 'v') reviveWithGold();
+  if (state === 'win' && k === 'escape') state = 'title';
 });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 let mouse = {x:0,y:0};
@@ -218,7 +219,8 @@ function spawnEnemy(type, at) {
   const late = Math.max(0, time - 240);   // 4분까지는 체력 증가 없음 (이후 후반일수록 가파르게 강해짐)
   const big = type === 'brute' || type === 'titan' || type === 'warlord' || type === 'colossus';
   const pw = Math.max(0, powerLv() - 15);   // 스킬을 많이 모을수록 적도 단단해짐
-  const scale = (big ? 1 + late / 150 + (late / 600) ** 2 : 1 + late / 300 + (late / 600) ** 2) * (1 + 0.012 * pw);
+  const scale = (big ? 1 + late / 150 + (late / 600) ** 2 : 1 + late / 300 + (late / 600) ** 2) * (1 + 0.012 * pw) * (1 + Math.max(0, time - 480) / 400);   // 8분(거미 여왕 시기) 이후 적 체력 추가 증가
+  
   enemies.push({ type, x:p.x, y:p.y,
     hp:t.hp*scale, maxHp:t.hp*scale, speed:t.speed*(1+Math.min(Math.max(0, time - 120)/350, 0.8)) * rand(.9,1.1),
     dmg:t.dmg * (1 + Math.max(0, time - 180) / 130) * (1 + 0.01 * pw), r:t.r, size:t.size, icon:t.icon, gem:t.gem,
@@ -237,7 +239,7 @@ const BOSS_KITS = [
 ];
 function spawnBoss(idx) {
   const b = BOSSES[idx - 1], p = ringPos(80);
-  const pw = Math.max(0, powerLv() - 10), hp = 21000 * [1.0, 1.3, 2.2, 3.0, 4.0][idx - 1] * (1 + 0.035 * pw);   // 스킬이 많을수록 보스도 단단
+  const pw = Math.max(0, powerLv() - 10), hp = 21000 * [1.0, 1.5, 2.7, 3.7, 4.7][idx - 1] * (1 + 0.035 * pw);   // 스킬이 많을수록 보스도 단단
   enemies.push({ type:'boss', boss:true, final:idx === 5, kit:BOSS_KITS[idx - 1], name:b.name, idx, x:p.x, y:p.y, hp, maxHp:hp, speed:55 + idx*4,
     dmg:(30 + idx*8) * (1 + time / 300), r:48, size:120, icon:b.icon, gem:5, flash:0, hitCd:0, gHit:0, kx:0, ky:0, kbMul:0.05,
     atkT:3, dashT:0, windT:0, dx:0, dy:0, spiralT:0, spiralCd:0, spiralA:0 });
@@ -551,12 +553,12 @@ function updateLasers(dt) {
   lasers = lasers.filter(l => l.t > 0);
 }
 const MINION_TYPES = [          // 스킬 레벨 1~6: 유령, 개구리, 슬라임, 독수리, 말 탄 기사, 드래곤
-  { icon:'spirit',      r:12, spd:1.0,  dmg:1.0, aoe:1.0, fly:0 },
-  { icon:'frog',        r:12, spd:1.15, dmg:1.0, aoe:1.0, fly:0 },
-  { icon:'slimeM',      r:13, spd:0.9,  dmg:1.1, aoe:1.2, fly:0 },
-  { icon:'eagle',       r:13, spd:1.6,  dmg:1.2, aoe:0.9, fly:1 },
-  { icon:'horseKnight', r:18, spd:1.3,  dmg:1.8, aoe:1.3, fly:0 },
-  { icon:'dragonM',     r:24, spd:1.0,  dmg:2.5, aoe:1.8, fly:0 },
+  { name:'유령', icon:'spirit',      r:12, spd:1.0,  dmg:1.0, aoe:1.0, fly:0 },
+  { name:'개구리', icon:'frog',        r:12, spd:1.15, dmg:1.0, aoe:1.0, fly:0 },
+  { name:'슬라임', icon:'slimeM',      r:13, spd:0.9,  dmg:1.1, aoe:1.2, fly:0 },
+  { name:'독수리', icon:'eagle',       r:13, spd:1.6,  dmg:1.2, aoe:0.9, fly:1 },
+  { name:'말 탄 기사', icon:'horseKnight', r:18, spd:1.3,  dmg:1.8, aoe:1.3, fly:0 },
+  { name:'드래곤', icon:'dragonM',     r:24, spd:1.0,  dmg:2.5, aoe:1.8, fly:0 },
 ];
 function updateMinions(dt) {
   const l = lvl('summoner');
@@ -1127,11 +1129,12 @@ const ICONS = {
   },
   rocket() {
     ctx.rotate(Math.PI / 4);
-    sh('#fb923c', () => poly([[-.18,.4],[0,1],[.18,.4]]));
-    sh('#ef4444', () => poly([[-.28,.05],[-.62,.72],[-.28,.42]])); sh('#ef4444', () => poly([[.28,.05],[.62,.72],[.28,.42]]));
-    sh('#e5e7eb', () => poly([[0,-1],[.28,-.4],[.28,.42],[-.28,.42],[-.28,-.4]]));
-    sh('#ef4444', () => poly([[0,-1],[.28,-.4],[-.28,-.4]]));
-    sh('#38bdf8', () => circ(0, -.02, .14), .06);
+    sh('#fb923c', () => poly([[-.2,.5],[0,1.15],[.2,.5]])); sh('#fde047', () => poly([[-.1,.5],[0,.9],[.1,.5]]), .0001);
+    sh('#ef4444', () => poly([[-.3,.0],[-.7,.75],[-.3,.5]])); sh('#ef4444', () => poly([[.3,.0],[.7,.75],[.3,.5]]));
+    sh('#e5e7eb', () => poly([[0,-1],[.3,-.55],[.3,.5],[-.3,.5],[-.3,-.55]]));
+    sh('#ef4444', () => poly([[0,-1.05],[.3,-.5],[-.3,-.5]]));
+    sh('#ef4444', () => poly([[-.3,.28],[.3,.28],[.3,.42],[-.3,.42]]), .0001);
+    sh('#38bdf8', () => circ(0, -.1, .15), .07);
   },
   meteor() {
     sh('#f97316', () => poly([[.05,-.75],[-1,.75],[.75,.05]]));
@@ -1851,10 +1854,22 @@ function drawWorld() {
       icon(p.lv >= 7 ? 'oilbarrel' : 'molotov', p.x, p.y, p.lv >= 7 ? 30 : 24, false, p.t * 12);
     } else if (p.kind === 'rocket') {
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
-      ctx.scale(p.lv >= 7 ? 3.4 : 1.5 + 0.22*p.lv, p.lv >= 7 ? 3.4 : 1.5 + 0.22*p.lv);
+      ctx.scale(p.lv >= 7 ? 2.6 : 1.0 + 0.16*p.lv, p.lv >= 7 ? 2.6 : 1.0 + 0.16*p.lv);
       if (p.lv >= 7) { ctx.shadowColor = '#fb923c'; ctx.shadowBlur = 10; }
-      ctx.fillStyle = '#e33'; ctx.fillRect(-10, -4, 20, 8);
-      ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(16, 0); ctx.lineTo(10, 4); ctx.fill();
+      { const ev = p.lv >= 7, fl = 6 + Math.random()*6;
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fb923c'; ctx.beginPath(); ctx.moveTo(-11, -3.5); ctx.lineTo(-13 - fl*1.6, 0); ctx.lineTo(-11, 3.5); ctx.fill();
+        ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.moveTo(-11, -2); ctx.lineTo(-12 - fl, 0); ctx.lineTo(-11, 2); ctx.fill();
+        ctx.lineJoin = 'round'; ctx.lineWidth = 1.6; ctx.strokeStyle = OUT;
+        ctx.fillStyle = ev ? '#f97316' : '#ef4444';
+        ctx.beginPath(); ctx.moveTo(-3, -4); ctx.lineTo(-12, -10); ctx.lineTo(-12, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-3, 4); ctx.lineTo(-12, 10); ctx.lineTo(-12, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ev ? '#334155' : '#e5e7eb'; ctx.beginPath(); ctx.roundRect(-12, -4.6, 22, 9.2, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ev ? '#fbbf24' : '#ef4444'; ctx.fillRect(-7, -4.2, 3.5, 8.4);
+        ctx.beginPath(); ctx.moveTo(10, -4.6); ctx.quadraticCurveTo(18, -3.5, 21, 0); ctx.quadraticCurveTo(18, 3.5, 10, 4.6); ctx.closePath();
+        ctx.fillStyle = ev ? '#f97316' : '#ef4444'; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(3, 0, 2.4, 0, 7); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(2.3, -.8, .7, 0, 7); ctx.fill(); }
       ctx.restore();
     }
   }
@@ -2142,7 +2157,7 @@ function statGrid(rows, prev, base, x, y, cw) {            // 2열 표시, 이�
 function drawInfo() {
   ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
   const codex = infoFrom === 'codex', k = infoKey, u = UPGRADES[k], lv = codex ? 0 : P.w[k], evo = !codex && lv >= MAXLV && !!u.evo, fn = SKILL_STATS[k];
-  const cw = Math.min(640, W - 24), ch = Math.min(H - 20, 600), x = W/2 - cw/2, y = H/2 - ch/2;
+  const cw = Math.min(640, W - 24), ch = Math.min(H - 20, k === 'summoner' ? 720 : 600), x = W/2 - cw/2, y = H/2 - ch/2;
   infoCard = { x, y, w:cw, h:ch };
   ctx.fillStyle = evo ? '#4a3a1a' : '#26304a'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 14); ctx.fill(); ctx.stroke();
@@ -2173,11 +2188,37 @@ function drawInfo() {
   const sn = Math.min(infoSel, nLv);
   text((u.evo && sn === 7 ? '진화 (' + u.evo.name + ')' : 'Lv ' + sn) + ' 능력치 (기본값)', x + 22, yy, 14, '#fff', 'left');
   if (!codex && sn > lv) text('아직 도달하지 않은 레벨', x + cw - 22, yy, 12, '#e5a24a', 'right');
-  statGrid(fn(sn), sn > 1 ? fn(sn - 1) : null, true, x + 22, yy + 24, cw - 44);
+  let ge = statGrid(fn(sn), sn > 1 ? fn(sn - 1) : null, true, x + 22, yy + 24, cw - 44);
+  const live = !(codex && codexFrom === 'title') && !!P;
+  if (codex && live) {
+    ge += 8; text('현재 플레이어 Lv.' + P.level + ' 기준 (피해 ×' + dmgMulNow().toFixed(2) + ', 쿨타임 ×' + cdMul().toFixed(2) + ')', x + 22, ge, 14, '#9fe29f', 'left');
+    ge = statGrid(fn(sn), null, false, x + 22, ge + 24, cw - 44);
+  }
+  if (k === 'summoner') {
+    ge += 10; text('정령별 정보' + (live ? ' (현재 보정 반영)' : ' (기본값)'), x + 22, ge, 14, '#ffd54a', 'left'); ge += 8;
+    const mul = live ? dmgMulNow() : 1, ev = sn >= 7, list = [];
+    if (ev) list.push({ nm:'골렘', icon:'golem', dmg:90, spd:120, aoe:130 });
+    for (let i = 0; i < (ev ? 6 : sn); i++) { const ty = MINION_TYPES[i];
+      list.push({ nm:ty.name, icon:ty.icon, dmg:(ev ? 45 : 14 + 6*sn) * ty.dmg, spd:(ev ? 230 : 150 + 10*sn) * ty.spd, aoe:(55 + 6*Math.min(sn, 6)) * ty.aoe, unlock:i + 1 }); }
+    list.forEach((r, i) => {
+      const ry = ge + i * 30;
+      icon(r.icon, x + 40, ry + 12, 24);
+      text(r.nm + (r.unlock ? ' (Lv' + r.unlock + '~)' : ''), x + 62, ry + 16, 13, '#fff', 'left');
+      text('피해 ' + fmtN(r.dmg * mul) + ' · 속도 ' + fmtN(r.spd) + (sn >= 3 ? ' · 폭발 반경 ' + fmtN(r.aoe) : ' · 접촉 공격'), x + cw - 22, ry + 16, 12, '#cfd8e6', 'right');
+    });
+    text('높은 레벨에서 얻는 정령일수록 피해·크기가 큽니다', x + 22, ge + list.length * 30 + 8, 12, '#9fb3c8', 'left');
+  }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.3.1';
+const VERSION = '1.3.2';
 const CHANGELOG = [
+  { v:'1.3.2', date:'2026-11-26', items:[
+    '게임 중 도감: 맨 위에 현재 플레이어 레벨 표시, 스킬 정보에 현재 플레이어 레벨 기준 성능 추가',
+    '소환사 정보에 정령별 피해·속도·폭발 반경 표시',
+    '거미 여왕·드래곤 등 보스 체력 증가, 8분 이후 일반 적 체력 추가 증가',
+    '로켓 모양 개선 (불꽃, 꼬리날개, 창문, 머리 부분)',
+    '최종 보스 처치 후 승리 화면에 "시작 화면으로" 버튼 추가 (승리 화면 복구)',
+  ] },
   { v:'1.3.1', date:'2026-11-26', items:[
     '플레이어 레벨이 오를수록 모든 스킬 피해 증가 (레벨당 +4%) — 후반에 얻은 1레벨 스킬도 쓸모 있게',
   ] },
@@ -2235,6 +2276,7 @@ function drawCodex() {
   ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
   text('스킬 도감', W/2, 54, 38, '#ffd54a');
   text('스킬을 누르면 효과와 레벨별 능력치를 볼 수 있습니다', W/2, 80, 14, '#ccc');
+  if (codexFrom !== 'title' && P) text('현재 플레이어 Lv.' + P.level + '  ·  스킬 피해 ×' + lvPowMul().toFixed(2) + ' (레벨당 +4%)', W/2, 24, 18, '#9fe29f');
   const v0 = 96, v1 = H - 70, cw = 150, ch = 128, gap = 12, cols = Math.max(1, Math.min(6, Math.floor((W - 30 + gap) / (cw + gap))));
   const x0 = W/2 - (cols * cw + (cols - 1) * gap) / 2;
   ctx.save(); ctx.beginPath(); ctx.rect(0, v0, W, v1 - v0); ctx.clip();
@@ -2265,6 +2307,18 @@ function drawPause() {
   button('계속하기 [Esc]', W/2 - 170, H/2, 160, 48, () => { state = 'play'; }, '#2f9e5b');
   button('스킬 도감', W/2 - 80, H/2 + 62, 160, 40, openCodex, '#7a4fd6');
   button('나가기', W/2 + 10, H/2, 160, 48, () => { endRun(); state = 'title'; }, '#c0392b');
+}
+function drawWin() {
+  ctx.fillStyle = '#000c'; ctx.fillRect(0, 0, W, H);
+  text('VICTORY!', W/2, H/2 - 90, 60, '#ffd54a');
+  text('죽음의 군주를 쓰러뜨렸습니다!', W/2, H/2 - 50, 22, '#fff');
+  const m = Math.floor(time/60), s = Math.floor(time%60);
+  text('생존 ' + m + '분 ' + s + '초  ·  처치 ' + kills + '  ·  Lv.' + P.level, W/2, H/2 - 14, 20);
+  icon('coin', W/2 - 90, H/2 + 24, 24); text('+' + (P.earned || 0) + ' 골드 (클리어 보너스 +1000 포함)', W/2 - 72, H/2 + 32, 18, '#ffd54a', 'left');
+  text('보유 골드 ' + SAVE.gold, W/2, H/2 + 62, 15, '#ccc');
+  button('시작 화면으로 [Esc]', W/2 - 170, H/2 + 90, 340, 48, () => { state = 'title'; }, '#2f6fdd');
+  button('다시 시작 [R]', W/2 - 170, H/2 + 150, 160, 46, start, '#2f9e5b');
+  button('상점 [S]', W/2 + 10, H/2 + 150, 160, 46, openShop, '#e0932b');
 }
 function drawOver() {
   ctx.fillStyle = '#000c'; ctx.fillRect(0, 0, W, H);
