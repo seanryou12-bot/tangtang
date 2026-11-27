@@ -171,7 +171,7 @@ const UPGRADES = {
   boots:    { name:'신발',       icon:'boots', desc: l => l===0 ? '이동속도 증가' : '이동속도 추가 증가',
               evo:{ name:'질풍 신발',   icon:'bootsEvo', desc:'이동속도 대폭 증가, 몸에 닿는 적에게 피해' } },
   scroll:   { name:'닌자 스크롤', icon:'scroll', desc: l => l===0 ? '경험치 획득량 +20%' : '경험치 획득량 +20% 추가',
-              evo:{ name:'비전서',     icon:'book', desc:'경험치 3배, 보석 흡수 범위 대폭 증가' } },
+              evo:{ name:'비전서',     icon:'book', desc:'경험치 3배, 보석 흡수 범위 대폭 증가, 자석 아이템으로 모은 경험치는 추가로 3배' } },
   heart:    { name:'체력 증가',   icon:'heart', desc: l => l===0 ? '최대 체력 +100, 즉시 회복' : '최대 체력 +100 추가',
               evo:{ name:'불사의 심장', icon:'heartEvo', desc:'최대 체력 +200, 초당 5 재생, 사망 시 1회 부활' } },
   clock:    { name:'쿨타임 감소', icon:'stopwatch', desc: l => l===0 ? '모든 무기 쿨타임 -7%' : '쿨타임 추가 감소',
@@ -979,7 +979,7 @@ function update(dt) {
   for (const g of gems) {
     const d = Math.hypot(P.x - g.x, P.y - g.y) || 1;
     if (d < magnet || g.pull) { g.pull = true; g.x += (P.x-g.x)/d * 420 * dt; g.y += (P.y-g.y)/d * 420 * dt; }
-    if (d < P.r + 6) { g.dead = true; gainXp(g.v); }
+    if (d < P.r + 6) { g.dead = true; gainXp(g.v * (g.mag ? 3 : 1)); }
   }
   gems = gems.filter(g => !g.dead);
   if (gems.length > 600) gems.splice(0, gems.length - 600);
@@ -992,7 +992,7 @@ function update(dt) {
   for (const it of items) if (dist2(P, it) < (P.r + 16)**2) {
     it.dead = true;
     if (it.kind === 'meat') { P.hp = Math.min(P.maxHp, P.hp + 30); floaters.push({ x:P.x, y:P.y - 20, txt:'+30', t:0.8 }); }
-    else if (it.kind === 'magnet') { for (const g of gems) g.pull = true; for (const i of items) if (i.kind === 'coin') i.pull = true; }
+    else if (it.kind === 'magnet') { const bonus = lvl('scroll') >= 7; for (const g of gems) { g.pull = true; if (bonus) g.mag = true; } if (bonus) floaters.push({ x:P.x, y:P.y - 40, txt:'비전서! 경험치 x3', t:1.2, gold:true }); for (const i of items) if (i.kind === 'coin') i.pull = true; }
     else if (it.kind === 'coin') { P.gold += it.v; SAVE.gold += it.v; persist(); floaters.push({ x:P.x, y:P.y - 24, txt:'+' + it.v, t:0.7, gold:true }); }
     else if (it.kind === 'chest') P.pending++;
   }
@@ -2374,8 +2374,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 const CHANGELOG = [
+  { v:'1.7.1', date:'2026-11-27', items:[
+    '비전서(닌자 스크롤 7레벨)를 가지면 자석 아이템으로 모은 경험치가 추가로 3배',
+  ] },
   { v:'1.7.0', date:'2026-11-27', items:[
     '로그인/가입 추가: 시작 화면 오른쪽 위 버튼으로 아이디·비밀번호 계정 생성 (진행 상황이 계정별로 저장됨)',
     '계정은 이 브라우저에만 저장되며 비밀번호는 해시로 보관 (다른 기기와는 공유되지 않음)',
