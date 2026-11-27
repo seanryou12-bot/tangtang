@@ -23,6 +23,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if (state === 'auth') { authKey(e); return; }
   if (state === 'levelup' && ['1','2','3'].includes(k)) pick(+k - 1);
   if ((state === 'over' || state === 'win') && (k === 'r' || k === 'enter')) start();
   if (state === 'title' && (k === 'enter' || k === ' ')) start();
@@ -70,7 +71,7 @@ cv.addEventListener('click', e => {
     else if (codexRect && e.clientX >= codexRect.x && e.clientX <= codexRect.x + codexRect.w && e.clientY >= codexRect.y && e.clientY <= codexRect.y + codexRect.h) openCodex();
     else if (h) { infoKey = h.k; infoSel = Math.max(1, P.w[h.k]); infoFrom = state; state = 'info'; }
     else if (state === 'pause') for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
-  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary') {
+  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary' || state === 'auth') {
     for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
   }
 });
@@ -87,8 +88,65 @@ function nearest(from, list, maxD = Infinity) {
 // ---------- 저장 데이터 (골드/상점) ----------
 const SAVE_KEY = 'tangtang_save_v1';
 let SAVE = { gold:0, up:{}, aff:{}, chars:{ ninja:true }, char:'ninja' };
-function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j) SAVE = Object.assign(SAVE, j); } catch (e) {} SAVE.up = SAVE.up || {}; SAVE.aff = SAVE.aff || {}; SAVE.chars = SAVE.chars || { ninja:true }; SAVE.char = SAVE.char || 'ninja'; }
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch (e) {} }
+// 계정은 이 브라우저(localStorage)에만 저장됩니다. 서버가 없어서 다른 기기와는 공유되지 않습니다.
+const ACC_KEY = 'tangtang_accounts_v1', SESSION_KEY = 'tangtang_session_v1';
+let ACCOUNT = null;   // 로그인한 계정 키 (소문자 아이디), 비로그인이면 null (게스트 저장 사용)
+function readAccounts() { try { return JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch (e) { return {}; } }
+function writeAccounts(a) { try { localStorage.setItem(ACC_KEY, JSON.stringify(a)); } catch (e) {} }
+function normSave(j) {
+  const o = Object.assign({ gold:0, up:{}, aff:{}, chars:{ ninja:true }, char:'ninja' }, j || {});
+  o.up = o.up || {}; o.aff = o.aff || {}; o.chars = o.chars || { ninja:true }; o.char = o.char || 'ninja'; return o;
+}
+function loadSave() {
+  let g = null; try { g = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+  SAVE = normSave(g); ACCOUNT = null;
+  try { const k = localStorage.getItem(SESSION_KEY), a = readAccounts(); if (k && a[k]) { ACCOUNT = k; SAVE = normSave(a[k].save); } } catch (e) {}
+}
+function persist() {
+  try {
+    if (ACCOUNT) { const a = readAccounts(); if (a[ACCOUNT]) { a[ACCOUNT].save = SAVE; writeAccounts(a); return; } }
+    localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE));
+  } catch (e) {}
+}
+const NAME_RE = /^[A-Za-z0-9_]{2,16}$/;
+function fallbackHash(pw, salt) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57; const str = salt + pw;
+  for (let r = 0; r < 3000; r++) for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  return 'f:' + (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
+}
+async function hashPw(pw, salt, alg) {
+  if (alg !== 'f') {
+    try {
+      if (typeof crypto !== 'undefined' && crypto.subtle) {
+        const enc = new TextEncoder(), key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', salt:enc.encode(salt), iterations:100000, hash:'SHA-256' }, key, 256);
+        return 'p:' + [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {}
+  }
+  return fallbackHash(pw, salt);
+}
+function newSalt() { let s = ''; for (let i = 0; i < 16; i++) s += Math.floor(Math.random() * 16).toString(16); return s; }
+async function signUp(name, pw, pw2) {
+  if (!NAME_RE.test(name)) return '아이디는 영문·숫자·_ 2~16자로 입력하세요';
+  if (pw.length < 4) return '비밀번호는 4자 이상이어야 합니다';
+  if (pw !== pw2) return '비밀번호 확인이 일치하지 않습니다';
+  const acc = readAccounts(), key = name.toLowerCase();
+  if (acc[key]) return '이미 사용 중인 아이디입니다';
+  const salt = newSalt(), hash = await hashPw(pw, salt);
+  acc[key] = { name, salt, hash, save:JSON.parse(JSON.stringify(SAVE)) };   // 지금까지의 진행 상황을 새 계정으로 가져옴
+  writeAccounts(acc); try { localStorage.setItem(SESSION_KEY, key); } catch (e) {}
+  ACCOUNT = key; SAVE = normSave(acc[key].save); return null;
+}
+async function logIn(name, pw) {
+  const acc = readAccounts(), key = name.toLowerCase(), a = acc[key];
+  if (!a) return '존재하지 않는 아이디입니다';
+  const h = await hashPw(pw, a.salt, a.hash.startsWith('f:') ? 'f' : 'p');
+  if (h !== a.hash) return '비밀번호가 틀렸습니다';
+  try { localStorage.setItem(SESSION_KEY, key); } catch (e) {}
+  ACCOUNT = key; SAVE = normSave(a.save); return null;
+}
+function logOut() { persist(); try { localStorage.removeItem(SESSION_KEY); } catch (e) {} loadSave(); }
 loadSave();
 const upLv = id => SAVE.up[id] || 0;
 
@@ -2316,8 +2374,12 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const CHANGELOG = [
+  { v:'1.7.0', date:'2026-11-27', items:[
+    '로그인/가입 추가: 시작 화면 오른쪽 위 버튼으로 아이디·비밀번호 계정 생성 (진행 상황이 계정별로 저장됨)',
+    '계정은 이 브라우저에만 저장되며 비밀번호는 해시로 보관 (다른 기기와는 공유되지 않음)',
+  ] },
   { v:'1.6.0', date:'2026-11-27', items:[
     '적 도감 추가: 일반 적 11종 + 보스 5종의 능력치·출현 시기·특징 (시작 화면 [E], 일시정지 메뉴, 게임 화면 "적 도감" 버튼)',
   ] },
@@ -2504,6 +2566,53 @@ function drawBestiary() {
     btns.push({ x:0, y:0, w:W, h:H, fn:() => { bestSel = null; } });
   }
 }
+const AUTH = { mode:'login', name:'', pw:'', pw2:'', focus:0, show:false, msg:'', busy:false };
+function openAuth(mode) { Object.assign(AUTH, { mode, name:'', pw:'', pw2:'', focus:0, msg:'', busy:false }); state = 'auth'; }
+function authFields() { return AUTH.mode === 'login' ? ['name', 'pw'] : ['name', 'pw', 'pw2']; }
+function authKey(e) {
+  if (AUTH.busy) return;
+  const fs2 = authFields(), fld = fs2[AUTH.focus] || 'name';
+  if (e.key === 'Escape') { state = 'title'; return; }
+  if (e.key === 'Tab') { e.preventDefault(); AUTH.focus = (AUTH.focus + (e.shiftKey ? fs2.length - 1 : 1)) % fs2.length; return; }
+  if (e.key === 'Enter') { if (AUTH.focus < fs2.length - 1) AUTH.focus++; else authSubmit(); return; }
+  if (e.key === 'Backspace') { e.preventDefault(); AUTH[fld] = AUTH[fld].slice(0, -1); return; }
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+    if (fld === 'name') { if (/[A-Za-z0-9_]/.test(e.key) && AUTH.name.length < 16) AUTH.name += e.key; }
+    else if (AUTH[fld].length < 32) AUTH[fld] += e.key;
+  }
+}
+async function authSubmit() {
+  if (AUTH.busy) return;
+  AUTH.busy = true; AUTH.msg = '처리 중…';
+  let err;
+  try { err = AUTH.mode === 'login' ? await logIn(AUTH.name, AUTH.pw) : await signUp(AUTH.name, AUTH.pw, AUTH.pw2); } catch (e) { err = '오류가 발생했습니다'; }
+  AUTH.busy = false;
+  if (err) { AUTH.msg = err; return; }
+  state = 'title'; AUTH.pw = AUTH.pw2 = '';
+}
+function drawAuth() {
+  ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
+  const signup = AUTH.mode === 'signup', cw = Math.min(420, W - 30), x = W/2 - cw/2, fl = authFields();
+  const ch = 150 + fl.length * 74 + 120, y = Math.max(10, H/2 - ch/2);
+  ctx.fillStyle = '#26384f'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x - 20, y, cw + 40, ch, 14); ctx.fill(); ctx.stroke();
+  text(signup ? '계정 만들기' : '로그인', W/2, y + 52, 34, '#ffd54a');
+  const labels = { name:'아이디 (영문·숫자·_ 2~16자)', pw:'비밀번호 (4자 이상)', pw2:'비밀번호 확인' };
+  fl.forEach((fk, i) => {
+    const fy = y + 98 + i * 74, on = AUTH.focus === i;
+    text(labels[fk], x, fy - 8, 13, '#9fb3c8', 'left');
+    ctx.fillStyle = '#0d1824'; ctx.strokeStyle = on ? '#ffd54a' : '#556'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x, fy, cw, 40, 8); ctx.fill(); ctx.stroke();
+    const v = fk === 'name' || AUTH.show ? AUTH[fk] : '•'.repeat(AUTH[fk].length);
+    text(v + (on && Math.floor(performance.now() / 500) % 2 === 0 ? '|' : ''), x + 12, fy + 27, 18, '#fff', 'left');
+    btns.push({ x, y:fy, w:cw, h:40, fn:() => { AUTH.focus = i; } });
+  });
+  const by = y + 98 + fl.length * 74 - 10;
+  button(AUTH.show ? '비밀번호 숨기기' : '비밀번호 보기', x, by, 150, 30, () => { AUTH.show = !AUTH.show; }, '#475569');
+  if (AUTH.msg) text(AUTH.msg, W/2, by + 54, 15, AUTH.busy ? '#ccc' : '#ff8a80');
+  button(signup ? '가입하기 [Enter]' : '로그인 [Enter]', x, by + 70, cw, 44, authSubmit, '#2f9e5b');
+  button(signup ? '이미 계정이 있어요 → 로그인' : '계정이 없어요 → 가입', x, by + 124, cw, 38, () => openAuth(signup ? 'login' : 'signup'), '#475569');
+  button('돌아가기 [Esc]', x, by + 172, cw, 38, () => { state = 'title'; }, '#7a2e2e');
+  if (signup) text('아이디·비밀번호는 이 브라우저에만 저장됩니다 (서버 없음)', W/2, y + ch - 12, 12, '#9fb3c8');
+}
 function drawPause() {
   ctx.fillStyle = '#000a'; ctx.fillRect(0, 0, W, H);
   text('일시정지', W/2, H/2 - 70, 46, '#ffd54a');
@@ -2549,6 +2658,10 @@ function drawTitle() {
   text('v' + VERSION, 14, H - 16, 14, '#ffffffaa', 'left');
   button('스킬 도감 [C]', W/2 - 170, H/2 + 145, 160, 40, openCodex, '#7a4fd6');
   button('적 도감 [E]', W/2 + 10, H/2 + 145, 160, 40, openBest, '#b04a4a');
+  if (ACCOUNT) {
+    text('계정: ' + (readAccounts()[ACCOUNT] || {}).name, W - 20, 36, 16, '#9fe29f', 'right');
+    button('로그아웃', W - 130, 48, 110, 34, () => { logOut(); }, '#7a2e2e');
+  } else button('로그인 / 가입', W - 190, 20, 170, 40, () => openAuth('login'), '#2f6fdd');
   button('버전 기록', W - 190, H - 56, 170, 40, () => { state = 'changelog'; clScroll = 0; }, '#475569');
 }
 
@@ -2563,6 +2676,7 @@ function loop(now) {
   else if (state === 'changelog') drawChangelog();
   else if (state === 'codex') drawCodex();
   else if (state === 'bestiary') drawBestiary();
+  else if (state === 'auth') drawAuth();
   else {
     if (state === 'play') update(dt);
     drawWorld(); drawHUD();
