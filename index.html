@@ -29,6 +29,10 @@ addEventListener('keydown', e => {
   if ((state === 'title' || state === 'over' || state === 'win') && k === 's') openShop();
   if (state === 'shop' && (k === 'escape' || k === 'backspace')) { if (shopConfirm) shopConfirm = false; else closeShop(); }
   if (state === 'title' && k === 'c') openCodex();
+  if (state === 'title' && k === 'e') openBest();
+  if (state === 'bestiary' && (k === 'escape' || k === 'backspace' || k === 'e')) { if (bestSel !== null) bestSel = null; else closeBest(); }
+  if (state === 'bestiary' && (k === 'arrowdown' || k === 'pagedown')) bsScroll = Math.min(bsMax, bsScroll + 80);
+  if (state === 'bestiary' && (k === 'arrowup' || k === 'pageup')) bsScroll = Math.max(0, bsScroll - 80);
   if (state === 'codex' && (k === 'escape' || k === 'backspace' || k === 'c')) closeCodex();
   if (state === 'codex' && (k === 'arrowdown' || k === 'pagedown')) cxScroll = Math.min(cxMax, cxScroll + 80);
   if (state === 'codex' && (k === 'arrowup' || k === 'pageup')) cxScroll = Math.max(0, cxScroll - 80);
@@ -48,6 +52,7 @@ addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 let mouse = {x:0,y:0};
 cv.addEventListener('wheel', e => {
   if (state === 'shop') { shopScroll = Math.max(0, Math.min(shopMax, shopScroll + e.deltaY)); e.preventDefault(); }
+  else if (state === 'bestiary') { bsScroll = Math.max(0, Math.min(bsMax, bsScroll + e.deltaY)); e.preventDefault(); }
   else if (state === 'codex') { cxScroll = Math.max(0, Math.min(cxMax, cxScroll + e.deltaY)); e.preventDefault(); }
   else if (state === 'changelog') { clScroll = Math.max(0, Math.min(clMax, clScroll + e.deltaY)); e.preventDefault(); }
 }, { passive:false });
@@ -61,10 +66,11 @@ cv.addEventListener('click', e => {
     else if (!infoCard || e.clientX < infoCard.x || e.clientX > infoCard.x + infoCard.w || e.clientY < infoCard.y || e.clientY > infoCard.y + infoCard.h) state = infoFrom;
   } else if (state === 'play' || state === 'pause') {
     const h = hudRects.find(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
-    if (codexRect && e.clientX >= codexRect.x && e.clientX <= codexRect.x + codexRect.w && e.clientY >= codexRect.y && e.clientY <= codexRect.y + codexRect.h) openCodex();
+    if (enemyRect && e.clientX >= enemyRect.x && e.clientX <= enemyRect.x + enemyRect.w && e.clientY >= enemyRect.y && e.clientY <= enemyRect.y + enemyRect.h) openBest();
+    else if (codexRect && e.clientX >= codexRect.x && e.clientX <= codexRect.x + codexRect.w && e.clientY >= codexRect.y && e.clientY <= codexRect.y + codexRect.h) openCodex();
     else if (h) { infoKey = h.k; infoSel = Math.max(1, P.w[h.k]); infoFrom = state; state = 'info'; }
     else if (state === 'pause') for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
-  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex') {
+  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary') {
     for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
   }
 });
@@ -1998,6 +2004,9 @@ function drawHUD() {
   // 스킬 슬롯 (줄바꿈, 클릭하면 설명)
   hudRects = [];
   codexRect = { x:W - 76, y:122, w:60, h:26 };
+  enemyRect = { x:W - 148, y:122, w:66, h:26 };
+  { const r = enemyRect, hv = mouse.x >= r.x && mouse.x <= r.x + r.w && mouse.y >= r.y && mouse.y <= r.y + r.h;
+    ctx.fillStyle = hv ? '#3a4f73' : '#0008'; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 6); ctx.fill(); text('적 도감', r.x + r.w/2, r.y + 18, 13, '#ff9e9e'); }
   { const r = codexRect, hv = mouse.x >= r.x && mouse.x <= r.x + r.w && mouse.y >= r.y && mouse.y <= r.y + r.h;
     ctx.fillStyle = hv ? '#3a4f73' : '#0008'; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 6); ctx.fill(); text('도감', r.x + r.w/2, r.y + 18, 14, '#ffd54a'); }
   const cols = Math.max(2, Math.min(8, Math.floor((W / 2 - 300 - 16) / 48)));
@@ -2062,6 +2071,7 @@ function drawLevelUp() {
   });
 }
 
+let enemyRect = null, bestFrom = 'title', bestSel = null, bsScroll = 0, bsMax = 0;
 let codexRect = null, codexFrom = 'title', cxScroll = 0, cxMax = 0;
 let hudRects = [], infoKey = null, infoFrom = 'play';
 let btns = [], shopTab = 0, shopFrom = 'title', shopMsg = '', shopMsgT = 0;
@@ -2306,8 +2316,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.5.2';
+const VERSION = '1.6.0';
 const CHANGELOG = [
+  { v:'1.6.0', date:'2026-11-27', items:[
+    '적 도감 추가: 일반 적 11종 + 보스 5종의 능력치·출현 시기·특징 (시작 화면 [E], 일시정지 메뉴, 게임 화면 "적 도감" 버튼)',
+  ] },
   { v:'1.5.2', date:'2026-11-27', items:[
     '드래곤 확대(크기·화염 사거리 30%↑), 부채꼴 화염이 화면에 크게 표시, 숨결 시간 증가·재사용 단축',
     '말 탄 기사 확대, 돌진 거리 약 2배',
@@ -2413,12 +2426,91 @@ function drawCodex() {
   }
   button('닫기 [Esc]', W/2 - 80, H - 56, 160, 42, closeCodex, '#475569');
 }
+const ENEMY_DEX = [
+  { k:'zombie',  name:'좀비',     from:'시작부터',        desc:'가장 흔한 적. 느리지만 떼로 몰려옵니다.' },
+  { k:'dog',     name:'들개',     from:'30초~',           desc:'빠르게 달려드는 작은 적.' },
+  { k:'bug',     name:'벌레',     from:'1분~',            desc:'작고 약하지만 수가 많습니다.' },
+  { k:'brute',   name:'브루트',   from:'시작부터 (주기적 출현)', desc:'느리고 단단한 거구. 시간이 지날수록 더 자주 나옵니다.', big:true },
+  { k:'knight',  name:'기사',     from:'1분 30초~',       desc:'단단한 갑옷을 입은 적. 꾸준히 늘어납니다.' },
+  { k:'wolf',    name:'늑대',     from:'2분 30초~',       desc:'매우 빠르고 공격이 아픕니다.' },
+  { k:'spitter', name:'독 슬라임', from:'3분 10초~',       desc:'멀리서 보라색 독탄을 쏩니다 (발사 간격 길음).' },
+  { k:'titan',   name:'타이탄',   from:'4분 10초~ (8분 20초~ 2마리씩)', desc:'매우 단단한 거인.', big:true },
+  { k:'reaper',  name:'사신',     from:'4분 40초~',       desc:'엄청 빠르고 피해가 큽니다.' },
+  { k:'warlord', name:'워로드',   from:'6분 40초~',       desc:'강력한 전사. 체력이 매우 높습니다.', big:true },
+  { k:'colossus',name:'콜로서스', from:'10분~',           desc:'후반에 등장하는 최상위 거대 적. 체력과 피해가 압도적입니다.', big:true },
+];
+const BOSS_DEX = [
+  { name:'티라노 대왕', icon:'trex',   mul:1.0, desc:'돌진(붉은 경로 예고)과 발구르기(범위 충격파)를 씁니다.' },
+  { name:'거미 여왕',   icon:'spider', mul:1.5, desc:'조준 사격, 졸개 소환, 나선 탄막, 전방위 탄막을 씁니다.' },
+  { name:'드래곤',      icon:'dragon', mul:2.7, desc:'부채꼴 화염 조준 사격, 화염 낙하, 전방위 탄막, 돌진을 씁니다.' },
+  { name:'외계 군주',   icon:'alien',  mul:3.7, desc:'순간이동 후 사격, 광선 낙하, 나선 탄막, 조준 사격을 씁니다.' },
+  { name:'죽음의 군주', icon:'skull',  mul:4.7, desc:'모든 패턴(돌진·발구르기·낙하·나선·소환·순간이동)을 씁니다. 처치하면 게임 클리어!' },
+];
+const BEST_LIST = [...ENEMY_DEX.map(e => ({ ...e, icon:ENEMY_TYPES[e.k].icon })), ...BOSS_DEX.map((b, i) => ({ ...b, boss:i + 1, from:'보스 ' + (i + 1) }))];
+function dexHp(e, t) {   // spawnEnemy 의 체력 증가식과 같은 공식 (스킬 레벨 보정 제외)
+  const late = Math.max(0, t - 240), sc = (e.big ? 1 + late / 150 + (late / 600) ** 2 : 1 + late / 300 + (late / 600) ** 2) * (1 + Math.max(0, t - 480) / 400);
+  return ENEMY_TYPES[e.k].hp * sc;
+}
+function openBest() { bestFrom = state === 'play' ? 'pause' : state; state = 'bestiary'; bsScroll = 0; bestSel = null; }
+function closeBest() { state = bestFrom; }
+function drawBestiary() {
+  ctx.fillStyle = '#2a1b1b'; ctx.fillRect(0, 0, W, H);
+  text('적 도감', W/2, 54, 38, '#ff9e9e');
+  text('적을 누르면 능력치와 특징을 볼 수 있습니다', W/2, 80, 14, '#ccc');
+  const v0 = 96, v1 = H - 70, cw = 150, ch = 128, gap = 12, cols = Math.max(1, Math.min(6, Math.floor((W - 30 + gap) / (cw + gap))));
+  const x0 = W/2 - (cols * cw + (cols - 1) * gap) / 2, modal = bestSel !== null;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, v0, W, v1 - v0); ctx.clip();
+  BEST_LIST.forEach((e, i) => {
+    const x = x0 + (i % cols) * (cw + gap), y = v0 + 8 + Math.floor(i / cols) * (ch + gap) - bsScroll;
+    const hv = !modal && mouse.x >= x && mouse.x <= x + cw && mouse.y >= y && mouse.y <= y + ch && mouse.y > v0 && mouse.y < v1;
+    ctx.fillStyle = hv ? '#4a3a3a' : '#3a2a2a'; ctx.strokeStyle = e.boss ? '#ffd54a' : '#a66'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 10); ctx.fill(); ctx.stroke();
+    icon(e.icon, x + cw/2, y + 44, e.boss ? 66 : 54);
+    text(e.name, x + cw/2, y + 88, 16, e.boss ? '#ffd54a' : '#fff');
+    text(e.from.length > 14 ? e.from.slice(0, 13) + '…' : e.from, x + cw/2, y + 110, 12, '#d4a8a8');
+    if (y + ch > v0 && y < v1) btns.push({ x, y, w:cw, h:ch, y0:v0, y1:v1, fn:() => { bestSel = i; } });
+  });
+  ctx.restore();
+  const rows = Math.ceil(BEST_LIST.length / cols);
+  bsMax = Math.max(0, rows * (ch + gap) + 16 - (v1 - v0)); bsScroll = Math.max(0, Math.min(bsMax, bsScroll));
+  if (bsMax > 0) {
+    const th = Math.max(30, (v1 - v0) * (v1 - v0) / (bsMax + v1 - v0)), ty = v0 + (v1 - v0 - th) * (bsScroll / bsMax);
+    ctx.fillStyle = '#ffffff22'; ctx.fillRect(W - 12, v0, 6, v1 - v0); ctx.fillStyle = '#ff9e9ecc'; ctx.fillRect(W - 12, ty, 6, th);
+  }
+  button('닫기 [Esc]', W/2 - 80, H - 56, 160, 42, closeBest, '#475569');
+  if (modal) {
+    btns = [];
+    const e = BEST_LIST[bestSel], cwm = Math.min(560, W - 24), chm = Math.min(H - 20, e.boss ? 470 : 480), x = W/2 - cwm/2, y = H/2 - chm/2;
+    ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#3a2a2a'; ctx.strokeStyle = e.boss ? '#ffd54a' : '#e57373'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x, y, cwm, chm, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffffff14'; ctx.beginPath(); ctx.arc(x + 58, y + 62, 42, 0, 7); ctx.fill();
+    icon(e.icon, x + 58, y + 62, e.boss ? 76 : 64);
+    text(e.name, x + 118, y + 54, 26, e.boss ? '#ffd54a' : '#fff', 'left');
+    text(e.boss ? '보스 ' + e.boss + ' / 5' : '일반 적', x + 118, y + 80, 15, '#e0a0a0', 'left');
+    let yy = y + 128;
+    if (e.boss) {
+      const hp = 21000 * e.mul, rows2 = [['기본 체력', Math.round(hp)], ['접촉 피해(기본)', 30 + e.boss * 8], ['이동속도', 55 + e.boss * 4], ['출현', e.boss === 1 ? '3분' : '앞 보스 처치 5분 후']];
+      yy = statGrid(rows2, null, true, x + 22, yy, cwm - 44) + 8;
+      yy = wrapText('스킬을 많이 모을수록 체력이 더 늘어납니다 (스킬 레벨 합 10 초과분당 +3.5%).', x + 22, yy + 4, cwm - 44, 19, '#d4a8a8');
+    } else {
+      const t = ENEMY_TYPES[e.k];
+      const rows2 = [['체력(기본)', t.hp], ['이동속도', t.speed], ['접촉 피해', t.dmg], ['보석(경험치)', t.gem],
+        ['10분 체력', Math.round(dexHp(e, 600))], ['15분 체력', Math.round(dexHp(e, 900))], ['출현', e.from]];
+      yy = statGrid(rows2, null, true, x + 22, yy, cwm - 44) + 8;
+      yy = wrapText('시간이 지날수록 체력·피해·속도가 늘어나고, 스킬을 많이 모으면 더 단단해집니다. 3분부터는 일부가 엘리트(체력 2배, 피해 1.3배)로 나옵니다.', x + 22, yy + 4, cwm - 44, 19, '#d4a8a8');
+    }
+    yy = wrapText(e.desc, x + 22, yy + 12, cwm - 44, 20, '#ffe9a0');
+    text('아무 곳이나 누르거나 Esc로 닫기', W/2, y + chm - 14, 13, '#bbb', 'center');
+    btns.push({ x:0, y:0, w:W, h:H, fn:() => { bestSel = null; } });
+  }
+}
 function drawPause() {
   ctx.fillStyle = '#000a'; ctx.fillRect(0, 0, W, H);
   text('일시정지', W/2, H/2 - 70, 46, '#ffd54a');
   text('골드는 획득 즉시 저장됩니다', W/2, H/2 - 30, 15, '#ccc');
   button('계속하기 [Esc]', W/2 - 170, H/2, 160, 48, () => { state = 'play'; }, '#2f9e5b');
-  button('스킬 도감', W/2 - 80, H/2 + 62, 160, 40, openCodex, '#7a4fd6');
+  button('스킬 도감', W/2 - 170, H/2 + 62, 160, 40, openCodex, '#7a4fd6');
+  button('적 도감', W/2 + 10, H/2 + 62, 160, 40, openBest, '#b04a4a');
   button('나가기', W/2 + 10, H/2, 160, 48, () => { endRun(); state = 'title'; }, '#c0392b');
 }
 function drawWin() {
@@ -2455,7 +2547,8 @@ function drawTitle() {
   button('상점 [S]', W/2 + 10, H/2 + 85, 160, 48, openShop, '#e0932b');
   icon(charIcon(), W/2, H/2 + 225, 64);
   text('v' + VERSION, 14, H - 16, 14, '#ffffffaa', 'left');
-  button('스킬 도감 [C]', W/2 - 80, H/2 + 145, 160, 40, openCodex, '#7a4fd6');
+  button('스킬 도감 [C]', W/2 - 170, H/2 + 145, 160, 40, openCodex, '#7a4fd6');
+  button('적 도감 [E]', W/2 + 10, H/2 + 145, 160, 40, openBest, '#b04a4a');
   button('버전 기록', W - 190, H - 56, 170, 40, () => { state = 'changelog'; clScroll = 0; }, '#475569');
 }
 
@@ -2469,6 +2562,7 @@ function loop(now) {
   else if (state === 'shop') drawShop();
   else if (state === 'changelog') drawChangelog();
   else if (state === 'codex') drawCodex();
+  else if (state === 'bestiary') drawBestiary();
   else {
     if (state === 'play') update(dt);
     drawWorld(); drawHUD();
