@@ -2156,7 +2156,7 @@ const EQUIP = [
   { id:'greed',    name:'탐욕',       icon:'coin',   desc:'골드 획득 +10%',       max:5,  cost:l => 1500*(l+1), label:'골드 획득', fmt:l => '+' + 10*l + '%' },
   { id:'revive',   name:'부활 부적',   icon:'heartEvo', desc:'매 판 1회 부활',     max:1,  cost:l => 12500, label:'부활', fmt:l => l ? '보유' : '없음' },
 ].map(e => ({ ...e, store:'up' }));
-const AFFINITY = () => WEAPON_KEYS.filter(k => k !== 'dmgup').map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 증가 (레벨당 +20%)', max:10, cost:l => 1500*(l+1), store:'aff', label:'등장 확률', fmt:l => '+' + 20*l + '%' }));
+const AFFINITY = () => WEAPON_KEYS.filter(k => k !== 'dmgup').map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 증가', max:10, cost:l => 1500*(l+1), store:'aff', label:'등장 확률', fmt:l => '+' + 20*l + '%' }));
 
 const CHARS = [
   { id:'ninja',    name:'닌자',        icon:'ninja',     start:'kunai',     cost:0,    desc:'균형 잡힌 기본 캐릭터' },
@@ -2379,8 +2379,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.8.1';
+const VERSION = '1.8.2';
 const CHANGELOG = [
+  { v:'1.8.2', date:'2026-11-28', items:[
+    '상점 스킬 확률 카드의 설명 글자가 카드 밖으로 삐져나오던 문제 수정',
+  ] },
   { v:'1.8.1', date:'2026-11-28', items:[
     '상점 스킬 확률: 최대 레벨 3 → 10, 레벨당 등장 확률 +20%로 서서히 상승',
     '상점 장비·스킬 확률 항목마다 현재 효과와 다음 레벨 효과(%) 표시',
