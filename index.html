@@ -3,18 +3,27 @@
 <head>
 <meta charset="utf-8">
 <title>탕탕 - Survivor</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
   html,body{margin:0;height:100%;background:#111;overflow:hidden}
-  canvas{display:block;width:100%;height:100%}
+  canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-let W, H;
-function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+let W, H, SCALE = 1;
+const MODE_KEY = 'tangtang_mode';
+let MODE = (() => {   // 'pc' | 'mobile' (저장된 값이 없으면 터치 기기는 모바일)
+  try { const m = localStorage.getItem(MODE_KEY); if (m === 'pc' || m === 'mobile') return m; } catch (e) {}
+  return typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 ? 'mobile' : 'pc';
+})();
+function resize(){   // 모바일: 작은 화면에서도 UI 가 모두 들어오도록 가상 해상도를 키워 축소 표시
+  SCALE = MODE === 'mobile' ? Math.min(1, innerWidth / 720, innerHeight / 640) : 1;
+  W = cv.width = Math.round(innerWidth / SCALE); H = cv.height = Math.round(innerHeight / SCALE);
+}
+function setMode(m) { MODE = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) {} touchStick = null; resize(); }
 addEventListener('resize', resize); resize();
 
 // ---------- 입력 ----------
@@ -57,26 +66,68 @@ cv.addEventListener('wheel', e => {
   else if (state === 'codex') { cxScroll = Math.max(0, Math.min(cxMax, cxScroll + e.deltaY)); e.preventDefault(); }
   else if (state === 'changelog') { clScroll = Math.max(0, Math.min(clMax, clScroll + e.deltaY)); e.preventDefault(); }
 }, { passive:false });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+cv.addEventListener('mousemove', e => { mouse.x = e.clientX / SCALE; mouse.y = e.clientY / SCALE; });
 cv.addEventListener('click', e => {
+  if (Date.now() < noClickUntil) return;   // 드래그(스크롤) 직후의 클릭은 무시
+  const ex = e.clientX / SCALE, ey = e.clientY / SCALE;
   if (state === 'levelup') {
     let hitCard = false;
-    cardRects.forEach((r,i) => { if (!hitCard && e.clientX>=r.x && e.clientX<=r.x+r.w && e.clientY>=r.y && e.clientY<=r.y+r.h) { hitCard = true; pick(i); } });
-    if (!hitCard) for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h) { b.fn(); break; }
+    cardRects.forEach((r,i) => { if (!hitCard && ex>=r.x && ex<=r.x+r.w && ey>=r.y && ey<=r.y+r.h) { hitCard = true; pick(i); } });
+    if (!hitCard) for (const b of btns) if (ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h) { b.fn(); break; }
   } else if (state === 'info') {
-    const hit = btns.find(b => e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h);
+    const hit = btns.find(b => ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h);
     if (hit) hit.fn();
-    else if (!infoCard || e.clientX < infoCard.x || e.clientX > infoCard.x + infoCard.w || e.clientY < infoCard.y || e.clientY > infoCard.y + infoCard.h) state = infoFrom;
+    else if (!infoCard || ex < infoCard.x || ex > infoCard.x + infoCard.w || ey < infoCard.y || ey > infoCard.y + infoCard.h) state = infoFrom;
   } else if (state === 'play' || state === 'pause') {
-    const h = hudRects.find(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
-    if (enemyRect && e.clientX >= enemyRect.x && e.clientX <= enemyRect.x + enemyRect.w && e.clientY >= enemyRect.y && e.clientY <= enemyRect.y + enemyRect.h) openBest();
-    else if (codexRect && e.clientX >= codexRect.x && e.clientX <= codexRect.x + codexRect.w && e.clientY >= codexRect.y && e.clientY <= codexRect.y + codexRect.h) openCodex();
+    if (pauseRect && ex >= pauseRect.x && ex <= pauseRect.x + pauseRect.w && ey >= pauseRect.y && ey <= pauseRect.y + pauseRect.h) { state = state === 'play' ? 'pause' : 'play'; return; }
+    const h = hudRects.find(r => ex >= r.x && ex <= r.x + r.w && ey >= r.y && ey <= r.y + r.h);
+    if (enemyRect && ex >= enemyRect.x && ex <= enemyRect.x + enemyRect.w && ey >= enemyRect.y && ey <= enemyRect.y + enemyRect.h) openBest();
+    else if (codexRect && ex >= codexRect.x && ex <= codexRect.x + codexRect.w && ey >= codexRect.y && ey <= codexRect.y + codexRect.h) openCodex();
     else if (h) { infoKey = h.k; infoSel = Math.max(1, P.w[h.k]); infoFrom = state; state = 'info'; }
-    else if (state === 'pause') for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
+    else if (state === 'pause') for (const b of btns) if (ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h && (b.y0 === undefined || (ey >= b.y0 && ey <= b.y1))) { b.fn(); break; }
   } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary' || state === 'auth') {
-    for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h && (b.y0 === undefined || (e.clientY >= b.y0 && e.clientY <= b.y1))) { b.fn(); break; }
+    for (const b of btns) if (ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h && (b.y0 === undefined || (ey >= b.y0 && ey <= b.y1))) { b.fn(); break; }
   }
 });
+
+// ---------- 터치 (모바일 모드) ----------
+let touchStick = null, touchDrag = null, noClickUntil = 0, pauseRect = null;
+const STICK_R = 60;   // 조이스틱 반경: 이보다 멀리 끌면 기준점이 따라와 방향 전환이 빠름
+const SCROLLERS = {
+  shop:      d => { shopScroll = Math.max(0, Math.min(shopMax, shopScroll + d)); },
+  codex:     d => { cxScroll = Math.max(0, Math.min(cxMax, cxScroll + d)); },
+  bestiary:  d => { bsScroll = Math.max(0, Math.min(bsMax, bsScroll + d)); },
+  changelog: d => { clScroll = Math.max(0, Math.min(clMax, clScroll + d)); },
+};
+cv.addEventListener('touchstart', e => {
+  const t = e.changedTouches[0], x = t.clientX / SCALE, y = t.clientY / SCALE;
+  mouse.x = x; mouse.y = y;
+  if (MODE === 'mobile' && state === 'play' && !touchStick) touchStick = { id:t.identifier, sx:x, sy:y, x, y };
+  touchDrag = { id:t.identifier, y0:y, y, moved:false };
+}, { passive:true });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const x = t.clientX / SCALE, y = t.clientY / SCALE;
+    if (touchStick && t.identifier === touchStick.id) {
+      touchStick.x = x; touchStick.y = y;
+      const vx = x - touchStick.sx, vy = y - touchStick.sy, d = Math.hypot(vx, vy);
+      if (d > STICK_R) { touchStick.sx = x - vx / d * STICK_R; touchStick.sy = y - vy / d * STICK_R; }
+    }
+    if (touchDrag && t.identifier === touchDrag.id) {
+      if (Math.abs(y - touchDrag.y0) > 12) touchDrag.moved = true;
+      if (touchDrag.moved && SCROLLERS[state]) SCROLLERS[state](touchDrag.y - y);
+      touchDrag.y = y;
+    }
+  }
+}, { passive:false });
+function touchEnd(e) {
+  for (const t of e.changedTouches) {
+    if (touchStick && t.identifier === touchStick.id) touchStick = null;
+    if (touchDrag && t.identifier === touchDrag.id) { if (touchDrag.moved && SCROLLERS[state]) noClickUntil = Date.now() + 350; touchDrag = null; }
+  }
+}
+cv.addEventListener('touchend', touchEnd); cv.addEventListener('touchcancel', touchEnd);
 
 // ---------- 유틸 ----------
 const rand = (a,b) => a + Math.random()*(b-a);
@@ -926,6 +977,7 @@ function update(dt) {
 
   let dx = (keys['d']||keys['arrowright']?1:0) - (keys['a']||keys['arrowleft']?1:0);
   let dy = (keys['s']||keys['arrowdown']?1:0) - (keys['w']||keys['arrowup']?1:0);
+  if (touchStick) { const vx = touchStick.x - touchStick.sx, vy = touchStick.y - touchStick.sy, d = Math.hypot(vx, vy); if (d > 8) { dx = vx / d; dy = vy / d; } }
   const m = Math.hypot(dx, dy);
   if (m) { dx /= m; dy /= m; P.x += dx*speedOf()*dt; P.y += dy*speedOf()*dt; if (dx) P.face = dx > 0 ? 1 : -1; }
   P.hurtT -= dt; P.inv -= dt;
@@ -2084,6 +2136,16 @@ function drawHUD() {
   // 스킬 슬롯 (줄바꿈, 클릭하면 설명)
   hudRects = [];
   codexRect = { x:W - 76, y:122, w:60, h:26 };
+  pauseRect = null;
+  if (MODE === 'mobile') {
+    pauseRect = { x:W - 76, y:156, w:60, h:40 };
+    ctx.fillStyle = '#0009'; ctx.beginPath(); ctx.roundRect(pauseRect.x, pauseRect.y, pauseRect.w, pauseRect.h, 8); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(pauseRect.x + 21, pauseRect.y + 11, 6, 18); ctx.fillRect(pauseRect.x + 33, pauseRect.y + 11, 6, 18);
+    if (touchStick && state === 'play') {
+      ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff88'; ctx.fillStyle = '#ffffff1a'; ctx.beginPath(); ctx.arc(touchStick.sx, touchStick.sy, STICK_R, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffffaa'; ctx.beginPath(); ctx.arc(touchStick.x, touchStick.y, 22, 0, 7); ctx.fill();
+    }
+  }
   enemyRect = { x:W - 148, y:122, w:66, h:26 };
   { const r = enemyRect, hv = mouse.x >= r.x && mouse.x <= r.x + r.w && mouse.y >= r.y && mouse.y <= r.y + r.h;
     ctx.fillStyle = hv ? '#3a4f73' : '#0008'; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 6); ctx.fill(); text('적 도감', r.x + r.w/2, r.y + 18, 13, '#ff9e9e'); }
@@ -2399,8 +2461,12 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.9.5';
+const VERSION = '1.10.0';
 const CHANGELOG = [
+  { v:'1.10.0', date:'2026-11-28', items:[
+    '모바일 모드 추가: 시작 화면 왼쪽 위에서 PC / 모바일 선택 (터치 기기는 처음에 모바일)',
+    '모바일: 손가락을 댄 곳에서 드래그한 방향으로 이동, 일시정지 버튼, 목록 화면 드래그 스크롤, 화면 크기에 맞춘 축소, 로그인 시 화면 키보드',
+  ] },
   { v:'1.9.5', date:'2026-11-28', items:[
     '보석이 많아지면 오래된 보석이 사라지던 문제 수정 (주울 때까지 유지)',
   ] },
@@ -2638,13 +2704,32 @@ function drawBestiary() {
 }
 const AUTH = { mode:'login', name:'', pw:'', pw2:'', focus:0, show:false, msg:'', busy:false };
 function openAuth(mode) { Object.assign(AUTH, { mode, name:'', pw:'', pw2:'', focus:0, msg:'', busy:false }); state = 'auth'; }
+// 모바일에서는 화면 키보드를 띄우기 위한 숨은 입력창을 사용
+const kb = typeof document.createElement === 'function' && document.body ? document.createElement('input') : null;
+if (kb) {
+  kb.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:0;padding:0';
+  kb.setAttribute('autocapitalize', 'off'); kb.setAttribute('autocomplete', 'off'); kb.setAttribute('autocorrect', 'off');
+  document.body.appendChild(kb);
+  kb.addEventListener('input', () => {
+    if (state !== 'auth' || AUTH.busy) return;
+    const fk = authFields()[AUTH.focus] || 'name';
+    const v = fk === 'name' ? kb.value.replace(/[^A-Za-z0-9_]/g, '').slice(0, 16) : kb.value.slice(0, 32);
+    AUTH[fk] = v; kb.value = v;
+  });
+}
+function focusKb() {
+  if (!kb || MODE !== 'mobile') return;
+  const fk = authFields()[AUTH.focus] || 'name';
+  kb.type = fk === 'name' ? 'text' : 'password'; kb.value = AUTH[fk]; kb.focus();
+}
 function authFields() { return AUTH.mode === 'delete' ? ['pw'] : AUTH.mode === 'login' ? ['name', 'pw'] : ['name', 'pw', 'pw2']; }
 function authKey(e) {
   if (AUTH.busy) return;
+  if (kb && document.activeElement === kb && !['Enter', 'Escape', 'Tab'].includes(e.key)) return;   // 숨은 입력창이 처리
   const fs2 = authFields(), fld = fs2[AUTH.focus] || 'name';
   if (e.key === 'Escape') { state = 'title'; return; }
   if (e.key === 'Tab') { e.preventDefault(); AUTH.focus = (AUTH.focus + (e.shiftKey ? fs2.length - 1 : 1)) % fs2.length; return; }
-  if (e.key === 'Enter') { if (AUTH.focus < fs2.length - 1) AUTH.focus++; else authSubmit(); return; }
+  if (e.key === 'Enter') { if (AUTH.focus < fs2.length - 1) { AUTH.focus++; focusKb(); } else authSubmit(); return; }
   if (e.key === 'Backspace') { e.preventDefault(); AUTH[fld] = AUTH[fld].slice(0, -1); return; }
   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
     if (fld === 'name') { if (/[A-Za-z0-9_]/.test(e.key) && AUTH.name.length < 16) AUTH.name += e.key; }
@@ -2674,7 +2759,7 @@ function drawAuth() {
     ctx.fillStyle = '#0d1824'; ctx.strokeStyle = on ? '#ffd54a' : '#556'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x, fy, cw, 40, 8); ctx.fill(); ctx.stroke();
     const v = fk === 'name' || AUTH.show ? AUTH[fk] : '•'.repeat(AUTH[fk].length);
     text(v + (on && Math.floor(performance.now() / 500) % 2 === 0 ? '|' : ''), x + 12, fy + 27, 18, '#fff', 'left');
-    btns.push({ x, y:fy, w:cw, h:40, fn:() => { AUTH.focus = i; } });
+    btns.push({ x, y:fy, w:cw, h:40, fn:() => { AUTH.focus = i; focusKb(); } });
   });
   const by = y + 98 + fl.length * 74 - 10;
   button(AUTH.show ? '비밀번호 숨기기' : '비밀번호 보기', x, by, 150, 30, () => { AUTH.show = !AUTH.show; }, '#475569');
@@ -2722,7 +2807,10 @@ function drawTitle() {
   ctx.fillStyle = '#1b261b'; ctx.fillRect(0, 0, W, H);
   text('탕탕', W/2, H/2 - 70, 80, '#ffd54a');
   text('몰려오는 적을 처치하고 끝까지 살아남아라!', W/2, H/2 - 20, 20);
-  text('WASD / 방향키로 이동 · 무기는 자동 발사', W/2, H/2 + 20, 16, '#ccc');
+  text(MODE === 'mobile' ? '화면에 손가락을 대고 드래그한 방향으로 이동 · 무기는 자동 발사' : 'WASD / 방향키로 이동 · 무기는 자동 발사', W/2, H/2 + 20, 16, '#ccc');
+  text('조작 방식', 20, 30, 14, '#ffffffaa', 'left');
+  button('PC', 20, 40, 80, 40, () => setMode('pc'), MODE === 'pc' ? '#e0932b' : '#475569');
+  button('모바일', 106, 40, 90, 40, () => setMode('mobile'), MODE === 'mobile' ? '#e0932b' : '#475569');
   icon('coin', W/2 - 56, H/2 + 56, 22); text(String(SAVE.gold), W/2 - 40, H/2 + 63, 20, '#ffd54a', 'left');
   button('시작 [Enter]', W/2 - 170, H/2 + 85, 160, 48, start, '#2f9e5b');
   button('상점 [S]', W/2 + 10, H/2 + 85, 160, 48, openShop, '#e0932b');
@@ -2743,6 +2831,8 @@ let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   btns = [];
+  if (state !== 'play') touchStick = null;
+  if (state !== 'auth' && kb && document.activeElement === kb) kb.blur();
   if (state === 'info' && infoFrom === 'codex') { drawCodex(); btns = []; drawInfo(); } else
   if (state === 'title') drawTitle();
   else if (state === 'shop') drawShop();
