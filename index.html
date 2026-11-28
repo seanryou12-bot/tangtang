@@ -231,7 +231,7 @@ const UPGRADES = {
   drone:    { name:'공격용 드론', icon:'drone', desc: l => l===0 ? '따라다니며 적을 자동 사격하는 드론' : '레벨마다 드론 +1기, 드론·탄 크기, 연사 속도, 발사 수 증가',
               evo:{ name:'레이저 드론', icon:'droneEvo', desc:'드론 6기가 관통탄을 연사한다' } },
   boots:    { name:'신발',       icon:'boots', desc: l => l===0 ? '이동속도 증가' : '이동속도 추가 증가',
-              evo:{ name:'질풍 신발',   icon:'bootsEvo', desc:'이동속도 대폭 증가, 몸에 닿는 적에게 피해' } },
+              evo:{ name:'질풍 신발',   icon:'bootsEvo', desc:'이동속도 대폭 증가, 몸에 닿는 적에게 피해, 이동 중 받는 피해 -20%' } },
   scroll:   { name:'닌자 스크롤', icon:'scroll', desc: l => l===0 ? '경험치 획득량 +20%' : '경험치 획득량 +20% 추가',
               evo:{ name:'비전서',     icon:'book', desc:'경험치 3배, 보석 흡수 범위 대폭 증가, 자석 아이템으로 모은 경험치는 추가로 3배' } },
   heart:    { name:'체력 증가',   icon:'heart', desc: l => l===0 ? '최대 체력 +100, 즉시 회복' : '최대 체력 +100 추가',
@@ -522,6 +522,7 @@ function hurtPlayer(d) {
   if (P.inv > 0) return;
   d *= 1 - 0.04 * upLv('armor');               // 상점 갑옷
   if (lvl('shield')) d *= 1 - shieldDR();      // 방어막: 받는 피해 30%→60% 감소
+  if (lvl('boots') >= 7 && P.moving) d *= 0.8;  // 질풍 신발: 이동 중 받는 피해 -20%
   P.hp -= d; P.hurtT = 0.2;
   if (P.hp <= 0) {
     if ((lvl('heart') >= 7 || P.extraRevive) && !P.revived) {
@@ -979,9 +980,10 @@ function update(dt) {
   let dy = (keys['s']||keys['arrowdown']?1:0) - (keys['w']||keys['arrowup']?1:0);
   if (touchStick) { const vx = touchStick.x - touchStick.sx, vy = touchStick.y - touchStick.sy, d = Math.hypot(vx, vy); if (d > 8) { dx = vx / d; dy = vy / d; } }
   const m = Math.hypot(dx, dy);
+  P.moving = m > 0;
   if (m) { dx /= m; dy /= m; P.x += dx*speedOf()*dt; P.y += dy*speedOf()*dt; if (dx) P.face = dx > 0 ? 1 : -1; }
   P.hurtT -= dt; P.inv -= dt;
-  if (lvl('boots') >= 7) { P.trailT -= dt; if (P.trailT <= 0) { P.trailT = 0.04; P.trail.unshift({ x:P.x, y:P.y, face:P.face }); if (P.trail.length > 6) P.trail.pop(); } } else P.trail.length = 0;
+  if (lvl('boots') >= 7) { P.trailT -= dt; if (P.trailT <= 0) { P.trailT = 0.04; P.trail.unshift({ x:P.x, y:P.y, face:P.face }); if (P.trail.length > 16) P.trail.pop(); } } else P.trail.length = 0;
   if (lvl('heart') >= 7 && Math.random() < dt * 3) particles.push({ x:P.x + rand(-22,22), y:P.y, vx:0, vy:-45, t:0.8, c:'#ff7ab0' });
   if (lvl('heart') >= 7) P.hp = Math.min(P.maxHp, P.hp + 5*dt);
   cam.x += (P.x - cam.x) * Math.min(1, dt*8); cam.y += (P.y - cam.y) * Math.min(1, dt*8);
@@ -1910,7 +1912,19 @@ function drawEvoFX() {
   if (state === 'over') return;
   if (lvl('boots') >= 7) {                       // 질풍: 잔상
     ctx.shadowColor = '#7df'; ctx.shadowBlur = 10;
-    P.trail.forEach((t, i) => { ctx.globalAlpha = 0.3 - i*0.045; icon(charIcon(), t.x, t.y, 38, t.face < 0); });
+    P.trail.slice(0, 6).forEach((t, i) => { ctx.globalAlpha = 0.3 - i*0.045; icon(charIcon(), t.x, t.y, 38, t.face < 0); });
+    ctx.globalAlpha = 1;
+    const tr = P.trail, last = tr[tr.length - 1];
+    if (last && Math.hypot(last.x - P.x, last.y - P.y) > 12) {   // 지나온 길에 번개 줄기 3가닥
+      const len = Math.hypot(P.x - last.x, P.y - last.y), nx = -(P.y - last.y) / len, ny = (P.x - last.x) / len;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (const off of [-12, 0, 12]) {
+        const pts = [[P.x, P.y], ...tr.map((t, i) => { const j = off + (Math.random() - 0.5) * 18; return [t.x + nx * j, t.y + ny * j]; })];
+        ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+        ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 14; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = off ? 4 : 7; ctx.stroke();
+        ctx.shadowBlur = 0; ctx.strokeStyle = '#fef9c3'; ctx.lineWidth = off ? 1.5 : 3; ctx.stroke();
+      }
+    }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
   if (lvl('heart') >= 7) {                       // 불사의 심장: 분홍 오라 + 날개
@@ -2366,7 +2380,7 @@ const SKILL_STATS = {
   molotov:  l => [['던지는 개수', l >= 7 ? 3 : l >= 4 ? 2 : 1, '개'], ['불바다 반경', l >= 7 ? 210 : 70 + 12*l, ''], ['지속시간', l >= 7 ? 5 : 3, '초'], ['피해(0.3초마다)', l >= 7 ? 60 : 12 + 6*l, 'dmg'], ['쿨타임', l >= 7 ? 1.3 : 2.4 - 0.2*l, 'cd']],
   rocket:   l => [['발수', l >= 7 ? 7 : l, '발'], ['피해', l >= 7 ? 180 : 50 + 20*l, 'dmg'], ['폭발 반경', l >= 7 ? 140 : 70 + 10*l, ''], ['쿨타임', l >= 7 ? 1.6 : 2.8 - 0.2*l, 'cd']],
   drone:    l => [['드론 수', l >= 7 ? 6 : l, '기'], ['드론당 탄 수', l >= 7 ? 3 : 1 + Math.floor(l/2), '발'], ['피해', l >= 7 ? 40 : 9 + 3*l, 'dmg'], ['연사 간격', l >= 7 ? 0.2 : Math.max(0.2, 0.75 - 0.09*l), 'cd'], ['관통', l >= 7 ? 3 : 0, '회']],
-  boots:    l => l >= 7 ? [['이동속도', 220, '%'], ['접촉 피해(0.2초마다)', 20, 'dmg']] : [['이동속도', 100 + 12*l, '%']],
+  boots:    l => l >= 7 ? [['이동속도', 220, '%'], ['접촉 피해(0.2초마다)', 20, 'dmg'], ['이동 중 피해 감소', 20, '%']] : [['이동속도', 100 + 12*l, '%']],
   scroll:   l => l >= 7 ? [['경험치 획득', 300, '%'], ['보석 흡수 범위', '+320']] : [['경험치 획득', 100 + 20*l, '%']],
   heart:    l => [['최대 체력 증가', l >= 7 ? 800 : 100*l, ''], ['재생', l >= 7 ? 5 : 0, '/초'], ['부활', l >= 7 ? '1회' : '-']],
   clock:    l => l >= 7 ? [['쿨타임 감소', 55, '%'], ['모든 적 둔화', 20, '%'], ['시간 정지', '20초마다 2.5초']] : [['쿨타임 감소', 7*l, '%'], ['모든 적 둔화', 2*l, '%']],
@@ -2461,8 +2475,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.10.0';
+const VERSION = '1.10.1';
 const CHANGELOG = [
+  { v:'1.10.1', date:'2026-11-28', items:[
+    '질풍 신발(신발 최대 레벨): 지나온 길에 번개 줄기 효과, 이동 중 받는 피해 -20%',
+  ] },
   { v:'1.10.0', date:'2026-11-28', items:[
     '모바일 모드 추가: 시작 화면 왼쪽 위에서 PC / 모바일 선택 (터치 기기는 처음에 모바일)',
     '모바일: 손가락을 댄 곳에서 드래그한 방향으로 이동, 일시정지 버튼, 목록 화면 드래그 스크롤, 화면 크기에 맞춘 축소, 로그인 시 화면 키보드',
