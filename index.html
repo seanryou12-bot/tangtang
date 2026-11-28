@@ -29,8 +29,8 @@ addEventListener('keydown', e => {
   if (state === 'title' && (k === 'enter' || k === ' ')) start();
   if ((state === 'title' || state === 'over' || state === 'win') && k === 's') openShop();
   if (state === 'shop' && (k === 'escape' || k === 'backspace')) { if (shopConfirm) shopConfirm = false; else closeShop(); }
-  if (state === 'title' && k === 'c') openCodex();
-  if (state === 'title' && k === 'e') openBest();
+  if ((state === 'title' || state === 'levelup') && k === 'c') { openCodex(); return; }
+  if ((state === 'title' || state === 'levelup') && k === 'e') { openBest(); return; }
   if (state === 'bestiary' && (k === 'escape' || k === 'backspace' || k === 'e')) { if (bestSel !== null) bestSel = null; else closeBest(); }
   if (state === 'bestiary' && (k === 'arrowdown' || k === 'pagedown')) bsScroll = Math.min(bsMax, bsScroll + 80);
   if (state === 'bestiary' && (k === 'arrowup' || k === 'pageup')) bsScroll = Math.max(0, bsScroll - 80);
@@ -60,7 +60,9 @@ cv.addEventListener('wheel', e => {
 cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 cv.addEventListener('click', e => {
   if (state === 'levelup') {
-    cardRects.forEach((r,i) => { if (e.clientX>=r.x && e.clientX<=r.x+r.w && e.clientY>=r.y && e.clientY<=r.y+r.h) pick(i); });
+    let hitCard = false;
+    cardRects.forEach((r,i) => { if (!hitCard && e.clientX>=r.x && e.clientX<=r.x+r.w && e.clientY>=r.y && e.clientY<=r.y+r.h) { hitCard = true; pick(i); } });
+    if (!hitCard) for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h) { b.fn(); break; }
   } else if (state === 'info') {
     const hit = btns.find(b => e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h);
     if (hit) hit.fn();
@@ -145,6 +147,15 @@ async function logIn(name, pw) {
   if (h !== a.hash) return '비밀번호가 틀렸습니다';
   try { localStorage.setItem(SESSION_KEY, key); } catch (e) {}
   ACCOUNT = key; SAVE = normSave(a.save); return null;
+}
+async function deleteAccount(pw) {
+  const acc = readAccounts(), a = acc[ACCOUNT];
+  if (!a) return '로그인 상태가 아닙니다';
+  const h = await hashPw(pw, a.salt, a.hash.startsWith('f:') ? 'f' : 'p');
+  if (h !== a.hash) return '비밀번호가 틀렸습니다';
+  delete acc[ACCOUNT]; writeAccounts(acc);
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+  loadSave(); return null;
 }
 function logOut() { persist(); try { localStorage.removeItem(SESSION_KEY); } catch (e) {} loadSave(); }
 loadSave();
@@ -2111,6 +2122,8 @@ function drawLevelUp() {
   ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, W, H);
   text('LEVEL UP!', W/2, H/2 - 150, 44, '#ffd54a');
   text('보상을 선택하세요 (클릭 또는 1·2·3)', W/2, H/2 - 115, 16, '#ccc');
+  button('스킬 도감 [C]', W/2 - 170, H/2 + 168, 160, 40, openCodex, '#7a4fd6');
+  button('적 도감 [E]', W/2 + 10, H/2 + 168, 160, 40, openBest, '#b04a4a');
   const cw = 210, ch = 240, gap = 24, total = lvChoices.length*cw + (lvChoices.length-1)*gap;
   cardRects = [];
   lvChoices.forEach((k, i) => {
@@ -2379,8 +2392,13 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.8.4';
+const VERSION = '1.9.0';
 const CHANGELOG = [
+  { v:'1.9.0', date:'2026-11-28', items:[
+    '계정 삭제 추가: 로그인 후 시작 화면의 "계정 삭제" 버튼, 비밀번호 확인 후 삭제',
+    '레벨업 보상을 고르는 중에도 스킬 도감·적 도감을 볼 수 있음 ([C] / [E])',
+    '시작 화면에서 C/E 키로 도감이 열리지 않던 버그 수정',
+  ] },
   { v:'1.8.4', date:'2026-11-28', items:[
     '새 계정은 로그인 전 진행 상황을 가져오지 않고 항상 처음(골드 0, 설정 초기화)부터 시작',
   ] },
@@ -2595,7 +2613,7 @@ function drawBestiary() {
 }
 const AUTH = { mode:'login', name:'', pw:'', pw2:'', focus:0, show:false, msg:'', busy:false };
 function openAuth(mode) { Object.assign(AUTH, { mode, name:'', pw:'', pw2:'', focus:0, msg:'', busy:false }); state = 'auth'; }
-function authFields() { return AUTH.mode === 'login' ? ['name', 'pw'] : ['name', 'pw', 'pw2']; }
+function authFields() { return AUTH.mode === 'delete' ? ['pw'] : AUTH.mode === 'login' ? ['name', 'pw'] : ['name', 'pw', 'pw2']; }
 function authKey(e) {
   if (AUTH.busy) return;
   const fs2 = authFields(), fld = fs2[AUTH.focus] || 'name';
@@ -2612,18 +2630,19 @@ async function authSubmit() {
   if (AUTH.busy) return;
   AUTH.busy = true; AUTH.msg = '처리 중…';
   let err;
-  try { err = AUTH.mode === 'login' ? await logIn(AUTH.name, AUTH.pw) : await signUp(AUTH.name, AUTH.pw, AUTH.pw2); } catch (e) { err = '오류가 발생했습니다'; }
+  try { err = AUTH.mode === 'delete' ? await deleteAccount(AUTH.pw) : AUTH.mode === 'login' ? await logIn(AUTH.name, AUTH.pw) : await signUp(AUTH.name, AUTH.pw, AUTH.pw2); } catch (e) { err = '오류가 발생했습니다'; }
   AUTH.busy = false;
   if (err) { AUTH.msg = err; return; }
   state = 'title'; AUTH.pw = AUTH.pw2 = '';
 }
 function drawAuth() {
   ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
-  const signup = AUTH.mode === 'signup', cw = Math.min(420, W - 30), x = W/2 - cw/2, fl = authFields();
+  const signup = AUTH.mode === 'signup', del = AUTH.mode === 'delete', cw = Math.min(420, W - 30), x = W/2 - cw/2, fl = authFields();
   const ch = 150 + fl.length * 74 + 170, y = Math.max(10, H/2 - ch/2);
   ctx.fillStyle = '#26384f'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x - 20, y, cw + 40, ch, 14); ctx.fill(); ctx.stroke();
-  text(signup ? '계정 만들기' : '로그인', W/2, y + 52, 34, '#ffd54a');
-  const labels = { name:'아이디 (영문·숫자·_ 2~16자)', pw:'비밀번호 (4자 이상)', pw2:'비밀번호 확인' };
+  text(del ? '계정 삭제' : signup ? '계정 만들기' : '로그인', W/2, y + 52, 34, del ? '#ff8a80' : '#ffd54a');
+  if (del) text('골드·상점 구매 등 이 계정의 모든 기록이 사라집니다', W/2, y + 78, 13, '#ffb4a8');
+  const labels = { name:'아이디 (영문·숫자·_ 2~16자)', pw:del ? '비밀번호 확인 (삭제하려면 입력)' : '비밀번호 (4자 이상)', pw2:'비밀번호 확인' };
   fl.forEach((fk, i) => {
     const fy = y + 98 + i * 74, on = AUTH.focus === i;
     text(labels[fk], x, fy - 8, 13, '#9fb3c8', 'left');
@@ -2635,8 +2654,8 @@ function drawAuth() {
   const by = y + 98 + fl.length * 74 - 10;
   button(AUTH.show ? '비밀번호 숨기기' : '비밀번호 보기', x, by, 150, 30, () => { AUTH.show = !AUTH.show; }, '#475569');
   if (AUTH.msg) text(AUTH.msg, W/2, by + 54, 15, AUTH.busy ? '#ccc' : '#ff8a80');
-  button(signup ? '가입하기 [Enter]' : '로그인 [Enter]', x, by + 70, cw, 44, authSubmit, '#2f9e5b');
-  button(signup ? '이미 계정이 있어요 → 로그인' : '계정이 없어요 → 가입', x, by + 124, cw, 38, () => openAuth(signup ? 'login' : 'signup'), '#475569');
+  button(del ? '계정 삭제 [Enter]' : signup ? '가입하기 [Enter]' : '로그인 [Enter]', x, by + 70, cw, 44, authSubmit, del ? '#c0392b' : '#2f9e5b');
+  if (!del) button(signup ? '이미 계정이 있어요 → 로그인' : '계정이 없어요 → 가입', x, by + 124, cw, 38, () => openAuth(signup ? 'login' : 'signup'), '#475569');
   button('돌아가기 [Esc]', x, by + 172, cw, 38, () => { state = 'title'; }, '#7a2e2e');
   if (signup) text('아이디·비밀번호는 이 브라우저에만 저장됩니다 (서버 없음)', W/2, y + ch - 12, 12, '#9fb3c8');
 }
@@ -2688,6 +2707,7 @@ function drawTitle() {
   if (ACCOUNT) {
     text('계정: ' + (readAccounts()[ACCOUNT] || {}).name, W - 20, 36, 16, '#9fe29f', 'right');
     button('로그아웃', W - 130, 48, 110, 34, () => { logOut(); }, '#7a2e2e');
+    button('계정 삭제', W - 130, 88, 110, 30, () => openAuth('delete'), '#5a1f1f');
   } else button('로그인 / 가입', W - 190, 20, 170, 40, () => openAuth('login'), '#2f6fdd');
   button('버전 기록', W - 190, H - 56, 170, 40, () => { state = 'changelog'; clScroll = 0; }, '#475569');
 }
