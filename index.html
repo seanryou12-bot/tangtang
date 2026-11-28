@@ -251,7 +251,7 @@ const UPGRADES = {
   magnet:   { name:'자석',       icon:'magnet', desc: l => l===0 ? '보석 흡수 범위 증가, 자석 아이템이 더 자주 드롭' : '흡수 범위·자석 드롭 확률 증가, 자석으로 모은 경험치 보너스 (최대 +100%)',
               evo:{ name:'초강력 자석', icon:'magnetEvo', desc:'보석 흡수 범위 대폭 증가(+400%), 자석 경험치 +100%, 자석 드롭이 매우 잦아진다' } },
   vampire:  { name:'뱀파이어 샷', icon:'vampire', desc: l => l===0 ? '빠른 흡혈 구체 여러 개 발사, 구체로 적을 처치하면 체력 5 회복' : '구체 +1개, 피해 증가, 쿨타임 감소',
-              evo:{ name:'뱀파이어 오라', icon:'vampireEvo', desc:'어두운 오라가 주위를 덮어, 그림자 안의 적 체력을 직접 흡수해 자신의 체력으로 만든다' } },
+              evo:{ name:'뱀파이어 오라', icon:'vampireEvo', desc:'흡혈 구체 발사를 유지하면서, 어두운 오라가 주위를 덮어 그림자 안의 적 체력을 직접 흡수해 자신의 체력으로 만든다' } },
   dmgup:    { name:'공격력 강화', icon:'powerup', desc: l => l===0 ? '모든 공격력 +5% (레벨 제한 없음)' : '모든 공격력 +5% 추가', evo:null },
   soccer:   { name:'축구공',     icon:'ball', desc: l => l===0 ? '적들 사이를 튕겨 다니는 축구공을 찬다' : '레벨마다 공 +1개, 공 크기·튕기는 횟수·피해 증가',
               evo:{ name:'불꽃 슈팅',   icon:'ballEvo', desc:'불타는 거대 축구공 6개가 15번씩 튕기며 폭발한다' } },
@@ -840,7 +840,7 @@ function updateWeapons(dt) {
   if (lvl('laser'))     { P.cd.laser -= dt;     if (P.cd.laser <= 0 && fireLaser())        P.cd.laser = (lvl('laser') >= 7 ? 5 : 3.4 - 0.22*lvl('laser')) * cm; }
   updateDrills(dt);
   if (lvl('vampire') >= 7) updateVampAura(dt);
-  else if (lvl('vampire')) { P.cd.vampire -= dt; if (P.cd.vampire <= 0 && fireVampire()) P.cd.vampire = (1.6 - 0.12*lvl('vampire')) * cm; }
+  if (lvl('vampire')) { P.cd.vampire -= dt; if (P.cd.vampire <= 0 && fireVampire()) P.cd.vampire = (1.6 - 0.12*lvl('vampire')) * cm; }
   if (lvl('soccer'))    { P.cd.soccer -= dt;    if (P.cd.soccer <= 0 && kickBall())        P.cd.soccer = (lvl('soccer') >= 7 ? 2.2 : 2.6 - 0.18*lvl('soccer')) * cm; }
   updateMinions(dt); updateLasers(dt);
   // 방어막
@@ -2476,7 +2476,7 @@ const SKILL_STATS = {
   soccer:   l => [['공 수', l >= 7 ? 6 : l, '개'], ['피해', l >= 7 ? 90 : 15 + 6*l, 'dmg'], ['튕김 횟수', l >= 7 ? 15 : 3 + l, '회'], ['크기', l >= 7 ? 34 : 11 + 2.5*l, ''], ['쿨타임', l >= 7 ? 2.2 : 2.6 - 0.18*l, 'cd']],
   magnet:   l => l >= 7 ? [['보석 흡수 범위 증가', 400, '%'], ['자석 경험치 보너스', 100, '%'], ['드롭 중 자석 비율', 90, '%'], ['고기/자석 드롭 간격', 35, '%']]
                           : [['보석 흡수 범위 증가', 25*l, '%'], ['자석 경험치 보너스', Math.min(100, 15*l), '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
-  vampire:  l => l >= 7 ? [['오라 반경', 190, ''], ['흡수 피해(0.4초마다)', 28, 'dmg'], ['흡수 체력 회복', 10, '%'], ['초당 최대 회복', 30, '']]
+  vampire:  l => l >= 7 ? [['구체 수', 9, '개'], ['구체 피해', 40, 'dmg'], ['처치 시 회복', 5, ''], ['구체 쿨타임', 0.76, 'cd'], ['오라 반경', 190, ''], ['흡수 피해(0.4초마다)', 28, 'dmg'], ['흡수 체력 회복', 10, '%'], ['초당 최대 회복', 30, '']]
                           : [['구체 수', 2 + l, '개'], ['피해', 12 + 4*l, 'dmg'], ['처치 시 회복', 5, ''], ['쿨타임', 1.6 - 0.12*l, 'cd']],
   dmgup:    l => [['모든 공격력 증가', 5*l, '%']],
 };
@@ -2561,8 +2561,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.12.1';
+const VERSION = '1.12.2';
 const CHANGELOG = [
+  { v:'1.12.2', date:'2026-11-28', items:[
+    '뱀파이어 오라(최대 레벨)에서도 흡혈 구체 발사 유지 (구체 9개, 피해 40)',
+  ] },
   { v:'1.12.1', date:'2026-11-28', items:[
     '쿠나이 강화: 피해 약 2~2.5배, 탄속 약 40%↑, 쿨타임 단축, 관통 증가 (최대 레벨 피해 40→100)',
   ] },
