@@ -909,7 +909,11 @@ function updateProjs(dt) {
       }
       const dx = p.target.x - p.x, dy = p.target.y - p.y, d = Math.hypot(dx, dy) || 1;
       p.x += dx/d*p.spd*dt; p.y += dy/d*p.spd*dt;
-      particles.push({ x:p.x, y:p.y, vx:0, vy:0, t:0.2, c:p.evo ? '#fb923c' : '#fff' });
+      p.a = Math.atan2(dy, dx);
+      if (p.evo) for (let i = 0; i < 6; i++) {   // 불꽃 슈팅: 진행 방향의 반대쪽으로 픽셀 불꽃
+        const back = p.a + Math.PI + rand(-0.45, 0.45), v = rand(80, 300);
+        particles.push({ s:rand(2.5, 7), x:p.x - dx/d*p.r*0.8 + rand(-8,8), y:p.y - dy/d*p.r*0.8 + rand(-8,8), vx:Math.cos(back)*v, vy:Math.sin(back)*v, t:rand(0.2, 0.4), c:['#ef4444','#fb923c','#fde047'][i % 3] });
+      } else particles.push({ x:p.x, y:p.y, vx:0, vy:0, t:0.2, c:'#fff' });
       if (d < p.r + p.target.r + 4) {
         const e = p.target;
         damageEnemy(e, p.dmg, dx/d*160, dy/d*160);
@@ -1717,6 +1721,10 @@ Object.assign(ICONS, {
   ballEvo() {
     const pent = (r, rot) => Array.from({ length: 5 }, (_, i) => [Math.cos(rot + i*Math.PI*2/5)*r, Math.sin(rot + i*Math.PI*2/5)*r]);
     ctx.save(); ctx.translate(0, -.95); ctx.scale(.7, .7); flameShape('#f97316', '#fde047'); ctx.restore();
+    ICONS.ballCore();
+  },
+  ballCore() {
+    const pent = (r, rot) => Array.from({ length: 5 }, (_, i) => [Math.cos(rot + i*Math.PI*2/5)*r, Math.sin(rot + i*Math.PI*2/5)*r]);
     ctx.shadowColor = '#fb923c'; ctx.shadowBlur = 16;
     sh('#ffd54a', () => circ(0, 0, .88)); ctx.shadowBlur = 0;
     for (let i = 0; i < 5; i++) {
@@ -2070,7 +2078,11 @@ function drawWorld() {
       else star(p.x, p.y, p.r, p.spin, '#cde');
     } else if (p.kind === 'ball') {
       shadow(p.x, p.y + p.r, p.r);
-      icon(p.evo ? 'ballEvo' : 'ball', p.x, p.y, p.r*2.2, false, p.t * 10);
+      if (p.evo) {   // 큰 불꽃 혀: 항상 진행 방향의 반대쪽
+        const a = p.a || 0, fl = 1 + Math.sin(p.t * 40) * 0.12;
+        ctx.save(); ctx.translate(p.x - Math.cos(a)*p.r*0.9, p.y - Math.sin(a)*p.r*0.9); ctx.rotate(a - Math.PI/2); ctx.scale(p.r*1.1, p.r*1.35*fl); flameShape('#f97316', '#fde047'); ctx.restore();
+      }
+      icon(p.evo ? 'ballCore' : 'ball', p.x, p.y, p.r*2.2, false, p.t * 10);
     } else if (p.kind === 'brick') {
       if (p.t > 0) { const big = p.lv >= 7, k = 1 - p.h/p.h0, m = big ? 2.2 : 1;
         ctx.fillStyle = 'rgba(0,0,0,' + (0.15 + k*0.2) + ')'; ctx.beginPath(); ctx.ellipse(p.tx, p.ty, (8 + k*16)*m, (4 + k*7)*m, 0, 0, 7); ctx.fill();
@@ -2475,8 +2487,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.10.1';
+const VERSION = '1.10.2';
 const CHANGELOG = [
+  { v:'1.10.2', date:'2026-11-28', items:[
+    '불꽃 슈팅(축구공 최대 레벨): 불꽃이 항상 진행 방향의 반대쪽으로 향하고, 픽셀 불꽃 꼬리 추가',
+  ] },
   { v:'1.10.1', date:'2026-11-28', items:[
     '질풍 신발(신발 최대 레벨): 지나온 길에 번개 줄기 효과, 이동 중 받는 피해 -20%',
   ] },
