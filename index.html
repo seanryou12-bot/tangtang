@@ -35,7 +35,8 @@ addEventListener('keydown', e => {
   if (state === 'auth') { authKey(e); return; }
   if (state === 'levelup' && ['1','2','3'].includes(k)) pick(+k - 1);
   if ((state === 'over' || state === 'win') && (k === 'r' || k === 'enter')) start();
-  if (state === 'title' && (k === 'enter' || k === ' ')) start();
+  if (state === 'maps') { if (k === '1') selectMap(1); else if (k === '2') selectMap(2); else if (k === 'enter') selectMap(1); else if (k === 'escape' || k === 'backspace') state = 'title'; return; }
+  if (state === 'title' && (k === 'enter' || k === ' ')) { openMaps(); return; }
   if ((state === 'title' || state === 'over' || state === 'win') && k === 's') openShop();
   if (state === 'shop' && (k === 'escape' || k === 'backspace')) { if (shopConfirm) shopConfirm = false; else closeShop(); }
   if ((state === 'title' || state === 'levelup') && k === 'c') { openCodex(); return; }
@@ -85,7 +86,7 @@ cv.addEventListener('click', e => {
     else if (codexRect && ex >= codexRect.x && ex <= codexRect.x + codexRect.w && ey >= codexRect.y && ey <= codexRect.y + codexRect.h) openCodex();
     else if (h) { infoKey = h.k; infoSel = Math.max(1, P.w[h.k]); infoFrom = state; state = 'info'; }
     else if (state === 'pause') for (const b of btns) if (ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h && (b.y0 === undefined || (ey >= b.y0 && ey <= b.y1))) { b.fn(); break; }
-  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary' || state === 'auth') {
+  } else if (state === 'over' || state === 'win' || state === 'title' || state === 'shop' || state === 'changelog' || state === 'codex' || state === 'bestiary' || state === 'auth' || state === 'maps') {
     for (const b of btns) if (ex >= b.x && ex <= b.x + b.w && ey >= b.y && ey <= b.y + b.h && (b.y0 === undefined || (ey >= b.y0 && ey <= b.y1))) { b.fn(); break; }
   }
 });
@@ -147,7 +148,8 @@ let ACCOUNT = null;   // 로그인한 계정 키 (소문자 아이디), 비로�
 function readAccounts() { try { return JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch (e) { return {}; } }
 function writeAccounts(a) { try { localStorage.setItem(ACC_KEY, JSON.stringify(a)); } catch (e) {} }
 function normSave(j) {
-  const o = Object.assign({ gold:0, up:{}, aff:{}, chars:{ ninja:true }, char:'ninja' }, j || {});
+  const o = Object.assign({ gold:0, up:{}, aff:{}, chars:{ ninja:true }, char:'ninja', up2:{}, char2:'sonicist', cleared1:false }, j || {});
+  o.up2 = o.up2 || {}; o.char2 = o.char2 || 'sonicist';
   o.up = o.up || {}; o.aff = o.aff || {}; o.chars = o.chars || { ninja:true }; o.char = o.char || 'ninja'; return o;
 }
 function loadSave() {
@@ -210,7 +212,10 @@ async function deleteAccount(pw) {
 }
 function logOut() { persist(); try { localStorage.removeItem(SESSION_KEY); } catch (e) {} loadSave(); }
 loadSave();
-const upLv = id => SAVE.up[id] || 0;
+let MAPID = 1;   // 현재 플레이 맵: 1 초원, 2 붉은 고원
+const COMMON_SKILLS = ['boots', 'scroll', 'heart', 'clock', 'magnet', 'dmgup'];   // 두 맵 공통 보조 스킬
+const inMap = (k, m) => COMMON_SKILLS.includes(k) || (UPGRADES[k].map || 1) === m;
+const upLv = id => ((MAPID === 2 ? SAVE.up2 : SAVE.up) || {})[id] || 0;
 
 // ---------- 정의 ----------
 // 1~6레벨: 수치 강화 / 7레벨(MAX): 형태가 바뀌는 진화
@@ -252,6 +257,12 @@ const UPGRADES = {
               evo:{ name:'초강력 자석', icon:'magnetEvo', desc:'보석 흡수 범위 대폭 증가(+400%), 자석 경험치 +100%, 자석 드롭이 매우 잦아진다' } },
   vampire:  { name:'뱀파이어 샷', icon:'vampire', desc: l => l===0 ? '빠른 흡혈 구체 여러 개 발사, 구체로 적을 처치하면 체력 5 회복' : '구체 +1개, 피해 증가, 쿨타임 감소',
               evo:{ name:'뱀파이어 오라', icon:'vampireEvo', desc:'흡혈 구체 발사를 유지하면서, 어두운 오라가 주위를 덮어 그림자 안의 적 체력을 직접 흡수해 자신의 체력으로 만든다' } },
+  sonic:    { name:'음파',       map:2, icon:'sonic', desc: l => l===0 ? '플레이어를 중심으로 음파를 일으켜 피해를 주고 밀어낸다' : '범위·피해 증가, 쿨타임 감소 (4레벨부터 2연속)',
+              evo:{ name:'공명 폭발',   icon:'sonicEvo', desc:'거대한 음파가 3번 연속으로 퍼지며 적을 크게 날려버린다' } },
+  fireball: { name:'파이어볼',   map:2, icon:'fireball', desc: l => l===0 ? '가까운 적에게 불덩이를 쏴 폭발시킨다' : '피해·폭발 범위 증가, 2레벨마다 +1개',
+              evo:{ name:'메테오 플레어', icon:'fireballEvo', desc:'거대한 불덩이 5개가 크게 폭발하고 불바다를 남긴다' } },
+  emfield:  { name:'전자기장',   map:2, icon:'emfield', desc: l => l===0 ? '플레이어에게서 번개 줄기가 뻗어 주변 적을 감전시킨다' : '줄기 +1개, 범위·피해 증가 (4레벨부터 연쇄)',
+              evo:{ name:'플라즈마 폭풍', icon:'emfieldEvo', desc:'번개 줄기 14개가 넓은 범위를 쉴 새 없이 휩쓸고 연쇄한다' } },
   dmgup:    { name:'공격력 강화', icon:'powerup', desc: l => l===0 ? '모든 공격력 +5% (레벨 제한 없음)' : '모든 공격력 +5% 추가', evo:null },
   soccer:   { name:'축구공',     icon:'ball', desc: l => l===0 ? '적들 사이를 튕겨 다니는 축구공을 찬다' : '레벨마다 공 +1개, 공 크기·튕기는 횟수·피해 증가',
               evo:{ name:'불꽃 슈팅',   icon:'ballEvo', desc:'불타는 거대 축구공 6개가 15번씩 튕기며 폭발한다' } },
@@ -281,17 +292,17 @@ const BOSSES = [
 // ---------- 상태 ----------
 let state = 'title';
 let hazards = [];
-let P, items, enemies, gems, projs, pools, orbs = [], drones = [], ebullets, floaters, particles, minions = [], lasers = [], bolts = [], drillList = [];
+let P, items, enemies, gems, projs, pools, orbs = [], drones = [], ebullets, floaters, particles, minions = [], lasers = [], bolts = [], drillList = [], waves = [], arcs = [];
 let cam, time, kills, spawnT, bruteT, titanT, warlordT, colossusT, bossT, bossN, itemT, banner = 0, bannerTxt = '', lvChoices = [], cardRects = [];
 
 function start() {
   P = { x:0, y:0, hp:100, maxHp:100, r:12, xp:0, level:1, need:5, face:1, hurtT:0, pending:0,
         w:Object.fromEntries(WEAPON_KEYS.map(k => [k, 0])),
-        cd:{kunai:0, molotov:1, rocket:1, shuriken:1.5, lightning:2, laser:3, brick:2, soccer:1.5, vampire:1}, vampT:0, dcd:[], shieldCharges:0, shieldT:0, orbAngle:0,
+        cd:{kunai:0, molotov:1, rocket:1, shuriken:1.5, lightning:2, laser:3, brick:2, soccer:1.5, vampire:1, sonic:0.5, fireball:0.5, emfield:0.5}, vampT:0, dcd:[], shieldCharges:0, shieldT:0, orbAngle:0,
         auraT:0, spikeT:0, freeze:0, freezeCd:12, revived:false };
   P.w[curChar().start] = 1; P.trail = []; P.trailT = 0;
   P.maxHp = calcMaxHp(); P.hp = P.maxHp; P.gold = 0; P.ended = false; P.extraRevive = upLv('revive') > 0;
-  enemies = []; gems = []; items = []; projs = []; pools = []; ebullets = []; floaters = []; particles = []; orbs = []; drones = []; minions = []; lasers = []; bolts = []; drillList = []; hazards = [];
+  enemies = []; gems = []; items = []; projs = []; pools = []; ebullets = []; floaters = []; particles = []; orbs = []; drones = []; minions = []; lasers = []; bolts = []; drillList = []; hazards = []; waves = []; arcs = [];
   cam = {x:0, y:0}; time = 0; kills = 0; spawnT = 0; bruteT = 60; titanT = 250; warlordT = 400; colossusT = 600; bossT = 180; bossN = 0; itemT = rand(30, 45); banner = 0;
   state = 'play';
 }
@@ -310,7 +321,7 @@ const calcMaxHp = () => 100 + 5 * (P.level - 1) + 10 * upLv('vitality') + 100 * 
 
 // ---------- 레벨업 ----------
 function openLevelUp() {
-  const pool = WEAPON_KEYS.filter(k => k === 'dmgup' ? maxedCount() >= 5 : P.w[k] < MAXLV), picks = [];
+  const pool = WEAPON_KEYS.filter(k => inMap(k, MAPID) && (k === 'dmgup' ? maxedCount() >= 5 : P.w[k] < MAXLV)), picks = [];
   while (picks.length < 3 && pool.length) {                       // 가중치 추첨 (상점 '스킬 확률')
     const ws = pool.map(k => 1 + 0.2 * (SAVE.aff[k] || 0));
     let r = Math.random() * ws.reduce((a, b) => a + b, 0), i = 0;
@@ -468,7 +479,9 @@ function damageEnemy(e, dmg, kbx = 0, kby = 0) {
   floaters.push({ x:e.x, y:e.y - e.r, txt:Math.round(dmg), t:0.5 });
 }
 function victory() {                      // 죽음의 군주 처치 → 클리어
-  P.bonusGold = (P.bonusGold || 0) + 1000; SAVE.gold += 1000; endRun();
+  P.bonusGold = (P.bonusGold || 0) + 1000; SAVE.gold += 1000;
+  if (MAPID === 1 && !SAVE.cleared1) { SAVE.cleared1 = true; P.unlockedNew = true; }
+  endRun(); persist();
   state = 'win';
 }
 function killEnemy(e) {
@@ -565,6 +578,46 @@ function updateVampAura(dt) {        // 최대 레벨: 그림자 안의 적 체�
     if (links < 14) { links++; const dx = P.x - e.x, dy = P.y - e.y; particles.push({ s:3, x:e.x, y:e.y, vx:dx/0.35, vy:dy/0.35, t:0.35, c:'#e11d48' }); }
   }
   if (drained > 0) vampHeal(Math.min(12, drained * 0.1), true);   // 흡수량의 10%, 0.4초마다 최대 12 (초당 30)
+}
+function emitSonic() {
+  const lv = lvl('sonic'), evo = lv >= 7, max = evo ? 420 : 150 + 22*lv;
+  if (!nearest(P, enemies, max + 80)) return false;
+  const n = evo ? 3 : lv >= 4 ? 2 : 1;
+  for (let i = 0; i < n; i++) waves.push({ r:14, t:-i*0.18, max, spd:evo ? 700 : 520, dmg:evo ? 90 : 14 + 6*lv, kb:evo ? 700 : 430, hit:new Set(), evo });
+  return true;
+}
+function updateWaves(dt) {
+  for (const w of waves) {
+    w.t += dt; if (w.t < 0) continue;
+    w.r += w.spd * dt;
+    for (const e of enemies) {
+      if (e.hp <= 0 || w.hit.has(e)) continue;
+      const dx = e.x - P.x, dy = e.y - P.y, d = Math.hypot(dx, dy) || 1;
+      if (d < w.r + e.r) { w.hit.add(e); damageEnemy(e, w.dmg, dx/d*w.kb, dy/d*w.kb); }
+    }
+  }
+  waves = waves.filter(w => w.r < w.max);
+}
+function fireFireball() {
+  const cands = enemies.filter(e => dist2(P, e) < 560*560).sort((a, b) => dist2(P, a) - dist2(P, b)); if (!cands.length) return false;
+  const lv = lvl('fireball'), evo = lv >= 7, n = evo ? 5 : 1 + Math.floor(lv / 2);
+  for (let i = 0; i < n; i++) {
+    const t = cands[i % cands.length], a = Math.atan2(t.y - P.y, t.x - P.x) + (i >= cands.length ? rand(-0.4, 0.4) : 0);
+    projs.push({ kind:'fireball', x:P.x, y:P.y, vx:Math.cos(a)*430, vy:Math.sin(a)*430, a, r:evo ? 22 : 9 + lv, dmg:evo ? 150 : 30 + 12*lv, boom:evo ? 130 : 50 + 8*lv, evo, life:1.5 });
+  }
+  return true;
+}
+function castArcs() {
+  const lv = lvl('emfield'), evo = lv >= 7, n = evo ? 14 : 2 + lv, range = evo ? 360 : 160 + 20*lv, dmg = evo ? 55 : 12 + 5*lv;
+  const near = enemies.filter(e => e.hp > 0 && dist2(P, e) < (range + e.r)**2).sort((a, b) => dist2(P, a) - dist2(P, b));
+  if (!near.length) return false;
+  const used = new Set();
+  for (const e of near.slice(0, n)) { used.add(e); damageEnemy(e, dmg, 0, 0); arcs.push({ from:null, x1:e.x, y1:e.y, t:0.16, evo }); }
+  if (lv >= 4) for (const e of [...used]) {        // 연쇄: 가까운 다른 적에게 60% 피해
+    const nx = near.find(q => !used.has(q) && q.hp > 0 && dist2(e, q) < 130*130);
+    if (nx) { used.add(nx); damageEnemy(nx, dmg * 0.6, 0, 0); arcs.push({ from:{ x:e.x, y:e.y }, x1:nx.x, y1:nx.y, t:0.16, evo }); }
+  }
+  return true;
 }
 function fireKunai() {
   const t = nearest(P, enemies, 600); if (!t) return false;
@@ -839,6 +892,11 @@ function updateWeapons(dt) {
   if (lvl('brick'))     { P.cd.brick -= dt;     if (P.cd.brick <= 0 && throwBricks())      P.cd.brick = (lvl('brick') >= 7 ? 2.0 : 2.8 - 0.22*lvl('brick')) * cm; }
   if (lvl('laser'))     { P.cd.laser -= dt;     if (P.cd.laser <= 0 && fireLaser())        P.cd.laser = (lvl('laser') >= 7 ? 5 : 3.4 - 0.22*lvl('laser')) * cm; }
   updateDrills(dt);
+  if (lvl('sonic'))    { P.cd.sonic -= dt;    if (P.cd.sonic <= 0 && emitSonic())       P.cd.sonic = (lvl('sonic') >= 7 ? 1.4 : 2.2 - 0.12*lvl('sonic')) * cm; }
+  if (lvl('fireball')) { P.cd.fireball -= dt; if (P.cd.fireball <= 0 && fireFireball()) P.cd.fireball = (lvl('fireball') >= 7 ? 1.0 : 1.4 - 0.08*lvl('fireball')) * cm; }
+  if (lvl('emfield'))  { P.cd.emfield -= dt;  if (P.cd.emfield <= 0 && castArcs())      P.cd.emfield = (lvl('emfield') >= 7 ? 0.3 : 0.7 - 0.04*lvl('emfield')) * cm; }
+  updateWaves(dt);
+  for (const a of arcs) a.t -= dt; arcs = arcs.filter(a => a.t > 0);
   if (lvl('vampire') >= 7) updateVampAura(dt);
   if (lvl('vampire')) { P.cd.vampire -= dt; if (P.cd.vampire <= 0 && fireVampire()) P.cd.vampire = (1.6 - 0.12*lvl('vampire')) * cm; }
   if (lvl('soccer'))    { P.cd.soccer -= dt;    if (P.cd.soccer <= 0 && kickBall())        P.cd.soccer = (lvl('soccer') >= 7 ? 2.2 : 2.6 - 0.18*lvl('soccer')) * cm; }
@@ -907,7 +965,14 @@ function updateWeapons(dt) {
 
 function updateProjs(dt) {
   for (const p of projs) {
-    if (p.kind === 'vamp') {
+    if (p.kind === 'fireball') {
+      p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
+      for (let i = 0; i < (p.evo ? 4 : 2); i++) particles.push({ s:rand(2, p.evo ? 7 : 4.5), x:p.x + rand(-5,5), y:p.y + rand(-5,5), vx:-p.vx*0.25 + rand(-50,50), vy:-p.vy*0.25 + rand(-50,50), t:0.25, c:['#ef4444','#fb923c','#fde047'][Math.floor(Math.random()*3)] });
+      if (p.life <= 0 || enemies.some(e => e.hp > 0 && dist2(p, e) < (p.r + e.r)**2)) {
+        p.life = 0; explode(p.x, p.y, p.boom, p.dmg, '#fb923c');
+        if (p.evo) pools.push({ x:p.x, y:p.y, r:90, t:2, tick:0, dmg:30 });
+      }
+    } else if (p.kind === 'vamp') {
       p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
       particles.push({ x:p.x, y:p.y, vx:0, vy:0, t:0.15, c:'#9f1239' });
       for (const e of enemies) {
@@ -1481,6 +1546,14 @@ function brick0() {
 }
 
 Object.assign(ICONS, {
+  sonic() { sh('#164e63', () => circ(0, 0, .95)); [.78, .5].forEach(r => sh(null, () => circ(0, 0, r), .09)); ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = .1; [.78, .5].forEach(r => { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); }); sh('#cffafe', () => circ(0, 0, .22), .06); },
+  sonicEvo() { ctx.shadowColor = '#c084fc'; ctx.shadowBlur = 16; sh('#3b0764', () => circ(0, 0, .98)); ctx.shadowBlur = 0; ctx.strokeStyle = '#e9d5ff'; ctx.lineWidth = .09; [.8, .6, .4].forEach(r => { ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); }); sh('#f5f3ff', () => circ(0, 0, .18), .06); },
+  fireball() { sh('#ea580c', () => circ(.15, .15, .68)); sh('#ea580c', () => poly([[-.95,-.95],[.0,-.45],[-.45,0]]), .08); sh('#fbbf24', () => circ(.18, .18, .42), .05); ctx.fillStyle = '#fef9c3'; ctx.beginPath(); circ(.22, .22, .18); ctx.fill(); },
+  fireballEvo() { ctx.shadowColor = '#f97316'; ctx.shadowBlur = 18; ctx.save(); ctx.translate(-.35, -.35); ctx.scale(.55, .55); flameShape('#dc2626', '#fb923c'); ctx.restore(); sh('#dc2626', () => circ(.12, .15, .75)); ctx.shadowBlur = 0; sh('#f97316', () => circ(.15, .18, .5), .05); sh('#fde047', () => circ(.18, .2, .24), .04); },
+  emfield() { sh('#1e3a8a', () => circ(0, 0, .95)); sh('#93c5fd', () => poly([[.12,-.8],[-.4,.1],[-.05,.1],[-.2,.8],[.45,-.15],[.1,-.15],[.35,-.8]]), .08); },
+  emfieldEvo() { ctx.shadowColor = '#e879f9'; ctx.shadowBlur = 18; sh('#4a044e', () => circ(0, 0, .98)); ctx.shadowBlur = 0; for (let i = 0; i < 3; i++) { ctx.save(); ctx.rotate(i*Math.PI*2/3); sh('#f5d0fe', () => poly([[0,-.92],[-.2,-.4],[0,-.42],[-.08,.02],[.24,-.52],[.06,-.5],[.18,-.88]]), .05); ctx.restore(); } sh('#e879f9', () => circ(0, 0, .2), .05); },
+});
+Object.assign(ICONS, {
   vampire() {
     sh('#be123c', () => circ(0, 0, .82)); sh('#18040a', () => circ(0, 0, .5), .06);
     sh('#fff', () => poly([[-.3,-.08],[-.14,.42],[-.02,-.08]]), .05); sh('#fff', () => poly([[.02,-.08],[.14,.42],[.3,-.08]]), .05);
@@ -2028,8 +2101,13 @@ function drawWorld() {
   const ts = 96, i0 = Math.floor((cam.x - W/2)/ts), i1 = Math.floor((cam.x + W/2)/ts), j0 = Math.floor((cam.y - H/2)/ts), j1 = Math.floor((cam.y + H/2)/ts);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     const x = i*ts + ox, y = j*ts + oy, hv = Math.sin(i*127.1 + j*311.7)*43758.5453, h = hv - Math.floor(hv);
-    ctx.fillStyle = (i + j) & 1 ? '#8ad45a' : '#80cc52'; ctx.fillRect(x, y, ts + 1, ts + 1);
-    if (h < 0.4) {
+    ctx.fillStyle = MAPID === 2 ? ((i + j) & 1 ? '#4d3d40' : '#47383b') : ((i + j) & 1 ? '#8ad45a' : '#80cc52'); ctx.fillRect(x, y, ts + 1, ts + 1);
+    if (MAPID === 2) {                                  // 붉은 회색 고원: 균열과 바위
+      const tx = x + 12 + h*70, ty = y + 14 + ((h*7) % 1)*66;
+      if (h < 0.35) { ctx.strokeStyle = '#2a1c1f'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 14, ty + 6); ctx.lineTo(tx + 20, ty + 20); ctx.moveTo(tx + 14, ty + 6); ctx.lineTo(tx + 28, ty + 2); ctx.stroke();
+        if (h < 0.09) { ctx.strokeStyle = '#a8362f'; ctx.lineWidth = 1.5; ctx.stroke(); } }
+      else if (h > 0.86) { ctx.fillStyle = '#6b585a'; ctx.strokeStyle = '#2a1c1f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx, ty + 12); ctx.lineTo(tx + 7, ty); ctx.lineTo(tx + 20, ty + 3); ctx.lineTo(tx + 25, ty + 13); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    } else if (h < 0.4) {
       const tx = x + 14 + h*180, ty = y + 20 + h*150;
       ctx.strokeStyle = '#5fa83a'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath();
       ctx.moveTo(tx - 6, ty + 6); ctx.lineTo(tx - 8, ty - 4); ctx.moveTo(tx, ty + 6); ctx.lineTo(tx, ty - 8); ctx.moveTo(tx + 6, ty + 6); ctx.lineTo(tx + 8, ty - 4); ctx.stroke();
@@ -2137,6 +2215,10 @@ function drawWorld() {
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
       if (p.evo) { ctx.scale(1.5, 1.5); ctx.shadowColor = '#fa6'; ctx.shadowBlur = 10; }
       ctx.rotate(Math.PI / 2); ctx.scale(p.evo ? 1 : 0.8, p.evo ? 1 : 0.8); ctx.scale(13, 13); kun(); ctx.restore();   // 굵은 외곽선이 있는 쿠나이
+    } else if (p.kind === 'fireball') {
+      ctx.save(); ctx.shadowColor = '#f97316'; ctx.shadowBlur = 18; ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*1.2, 0, 7); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*0.75, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fef9c3'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*0.35, 0, 7); ctx.fill(); ctx.restore();
     } else if (p.kind === 'vamp') {
       ctx.save(); ctx.shadowColor = '#f43f5e'; ctx.shadowBlur = 14; ctx.fillStyle = '#be123c'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*1.25, 0, 7); ctx.fill();
       ctx.shadowBlur = 0; ctx.fillStyle = '#18040a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*0.7, 0, 7); ctx.fill();
@@ -2181,6 +2263,22 @@ function drawWorld() {
         ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(2.3, -.8, .7, 0, 7); ctx.fill(); }
       ctx.restore();
     }
+  }
+  for (const w of waves) {
+    if (w.t < 0) continue;
+    const a = Math.max(0, 1 - w.r / w.max);
+    ctx.strokeStyle = w.evo ? 'rgba(216,180,254,' + (0.35 + a*0.6) + ')' : 'rgba(165,243,252,' + (0.3 + a*0.6) + ')';
+    ctx.lineWidth = w.evo ? 14 : 8; ctx.beginPath(); ctx.arc(P.x, P.y, w.r, 0, 7); ctx.stroke();
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(P.x, P.y, Math.max(1, w.r - 16), 0, 7); ctx.stroke();
+  }
+  for (const a of arcs) {
+    const x0 = a.from ? a.from.x : P.x, y0 = a.from ? a.from.y : P.y, dx = a.x1 - x0, dy = a.y1 - y0, len = Math.hypot(dx, dy) || 1, seg = Math.max(3, Math.round(len / 28));
+    ctx.beginPath(); ctx.moveTo(x0, y0);
+    for (let i = 1; i < seg; i++) { const k = i / seg, j = (Math.random() - 0.5) * 22; ctx.lineTo(x0 + dx*k - dy/len*j, y0 + dy*k + dx/len*j); }
+    ctx.lineTo(a.x1, a.y1);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = a.evo ? '#e879f9' : '#60a5fa'; ctx.shadowBlur = 12; ctx.strokeStyle = a.evo ? '#c026d3' : '#3b82f6'; ctx.lineWidth = a.evo ? 7 : 5; ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = '#eff6ff'; ctx.lineWidth = 2; ctx.stroke();
   }
   for (const bo of bolts) {
     ctx.globalAlpha = bo.t / bo.tmax; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -2324,7 +2422,8 @@ function button(label, x, y, w, h, fn, col = '#2f6fdd') {
   text(label, x + w/2, y + h/2 + 7, 18);
   btns.push({ x, y, w, h, fn });
 }
-function openShop() { shopFrom = state; state = 'shop'; shopMsg = ''; shopConfirm = false; }
+let shopMap = 1;
+function openShop() { shopFrom = state; state = 'shop'; shopMsg = ''; shopConfirm = false; shopMap = SAVE.cleared1 ? MAPID : 1; }
 function closeShop() { state = shopFrom; }
 
 const EQUIP = [
@@ -2336,7 +2435,9 @@ const EQUIP = [
   { id:'greed',    name:'탐욕',       icon:'coin',   desc:'골드 획득 +10%',       max:5,  cost:l => 1500*(l+1), label:'골드 획득', fmt:l => '+' + 10*l + '%' },
   { id:'revive',   name:'부활 부적',   icon:'heartEvo', desc:'매 판 1회 부활',     max:1,  cost:l => 12500, label:'부활', fmt:l => l ? '보유' : '없음' },
 ].map(e => ({ ...e, store:'up' }));
-const AFFINITY = () => WEAPON_KEYS.filter(k => k !== 'dmgup').map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 증가', max:10, cost:l => 1500*(l+1), store:'aff', label:'등장 확률', fmt:l => '+' + 20*l + '%' }));
+const EQUIP2_NAMES = { armor:'흑요석 갑옷', vitality:'고원의 생명력', power:'증폭 핵', swift:'부유 장화', learn:'고대 기록', greed:'광맥 탐지', revive:'재의 부적' };
+const EQUIP2 = EQUIP.map(e => ({ ...e, name:EQUIP2_NAMES[e.id], store:'up2' }));   // 2번 맵 장비 (따로 성장)
+const AFFINITY = (m = 1) => WEAPON_KEYS.filter(k => k !== 'dmgup' && inMap(k, m)).map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 증가', max:10, cost:l => 1500*(l+1), store:'aff', label:'등장 확률', fmt:l => '+' + 20*l + '%' }));
 
 const CHARS = [
   { id:'ninja',    name:'닌자',        icon:'ninja',     start:'kunai',     cost:0,    desc:'균형 잡힌 기본 캐릭터' },
@@ -2346,11 +2447,16 @@ const CHARS = [
   { id:'miner',    name:'드릴 광부',    icon:'miner',     start:'drill',     cost:32500, desc:'드릴샷으로 시작' },
   { id:'summoner', name:'소환사',       icon:'summonerC', start:'summoner',  cost:40000, desc:'정령 소환으로 시작' },
 ];
-const curChar = () => CHARS.find(c => c.id === SAVE.char) || CHARS[0];
+const CHARS2 = [
+  { id:'sonicist', map:2, name:'음파술사',   icon:'striker', start:'sonic',    cost:0,     desc:'2번 맵 기본 캐릭터' },
+  { id:'pyro',     map:2, name:'화염술사',   icon:'mage',    start:'fireball', cost:30000, desc:'파이어볼로 시작' },
+  { id:'tesla',    map:2, name:'전기 기술자', icon:'robot',   start:'emfield',  cost:30000, desc:'전자기장으로 시작' },
+];
+const curChar = () => MAPID === 2 ? (CHARS2.find(c => c.id === SAVE.char2) || CHARS2[0]) : (CHARS.find(c => c.id === SAVE.char) || CHARS[0]);
 const charIcon = () => curChar().icon;
 let shopScroll = 0, shopMax = 0, shopConfirm = false;
 function resetAll() {
-  SAVE.gold = 0; SAVE.up = {}; SAVE.aff = {}; SAVE.chars = { ninja:true }; SAVE.char = 'ninja'; persist();
+  SAVE.gold = 0; SAVE.up = {}; SAVE.aff = {}; SAVE.chars = { ninja:true }; SAVE.char = 'ninja'; SAVE.up2 = {}; SAVE.char2 = 'sonicist'; persist();   // 맵 해금 기록은 유지
   shopConfirm = false; shopMsg = '상점이 전부 초기화되었습니다'; shopMsgT = 3;
 }
 
@@ -2368,19 +2474,25 @@ function resetItem(e) {                 // 초기화: 지금까지 쓴 골드를
   shopMsg = e.name + ' 초기화 (+' + refund + ' 골드 환급)'; shopMsgT = 2;
 }
 function pickChar(c) {
-  if (SAVE.chars[c.id]) { SAVE.char = c.id; shopMsg = c.name + ' 장착!'; }
+  const slot = c.map === 2 ? 'char2' : 'char';
+  if (SAVE.chars[c.id] || !c.cost) { SAVE[slot] = c.id; shopMsg = c.name + ' 장착!'; }
   else if (SAVE.gold < c.cost) shopMsg = '골드가 부족합니다';
-  else { SAVE.gold -= c.cost; SAVE.chars[c.id] = true; SAVE.char = c.id; shopMsg = c.name + ' 구매 & 장착!'; }
+  else { SAVE.gold -= c.cost; SAVE.chars[c.id] = true; SAVE[slot] = c.id; shopMsg = c.name + ' 구매 & 장착!'; }
   persist(); shopMsgT = 2;
 }
 function drawShop() {
-  ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
-  text('상점', W/2, 60, 42, '#ffd54a');
+  ctx.fillStyle = shopMap === 2 ? '#2e2022' : '#1b2a3a'; ctx.fillRect(0, 0, W, H);
+  text(shopMap === 2 ? '고원 상점' : '상점', W/2, 60, 42, '#ffd54a');
   icon('coin', W/2 - 50, 98, 26); text(String(SAVE.gold), W/2 - 32, 106, 24, '#ffd54a', 'left');
   const tabs = ['장비 [1]', '스킬 확률 [2]', '캐릭터 [3]'], bw = 150, tg = 10, tx0 = W/2 - (tabs.length*bw + (tabs.length-1)*tg)/2;
   tabs.forEach((t, i) => button(t, tx0 + i*(bw+tg), 124, bw, 38, () => { shopTab = i; shopScroll = 0; }, shopTab === i ? '#e0932b' : '#475569'));
   const v0 = 176, v1 = H - 70;
-  const list = shopTab === 0 ? EQUIP : shopTab === 1 ? AFFINITY() : CHARS;
+  if (SAVE.cleared1) {
+    text('상점 맵', 20, 30, 14, '#ffffffaa', 'left');
+    button('1번 맵', 20, 40, 90, 36, () => { shopMap = 1; shopScroll = 0; }, shopMap === 1 ? '#2f9e5b' : '#475569');
+    button('2번 맵', 116, 40, 90, 36, () => { shopMap = 2; shopScroll = 0; }, shopMap === 2 ? '#b04a4a' : '#475569');
+  } else shopMap = 1;
+  const list = shopTab === 0 ? (shopMap === 2 ? EQUIP2 : EQUIP) : shopTab === 1 ? AFFINITY(shopMap) : (shopMap === 2 ? CHARS2 : CHARS);
   const cw = 250, gap = 14, ch = 118, cols = Math.max(1, Math.min(4, Math.floor((W - 30) / (cw + gap)))), rows = Math.ceil(list.length / cols);
   const total = cols * cw + (cols - 1) * gap;
   shopMax = Math.max(0, rows * (ch + gap) + 10 - (v1 - v0)); shopScroll = Math.max(0, Math.min(shopMax, shopScroll));
@@ -2392,7 +2504,7 @@ function drawShop() {
     const hover = inView && mouse.x >= x && mouse.x <= x + cw && mouse.y >= y && mouse.y <= y + ch;
     const isChar = shopTab === 2;
     const lv = isChar ? 0 : (SAVE[e.store][e.id] || 0), maxed = !isChar && lv >= e.max, price = isChar ? e.cost : maxed ? 0 : e.cost(lv);
-    const owned = isChar && !!SAVE.chars[e.id], equipped = isChar && SAVE.char === e.id;
+    const owned = isChar && (!!SAVE.chars[e.id] || !e.cost), equipped = isChar && SAVE[e.map === 2 ? 'char2' : 'char'] === e.id;
     const can = isChar ? (owned || SAVE.gold >= price) : (!maxed && SAVE.gold >= price);
     ctx.fillStyle = hover ? '#34506e' : '#26384f'; ctx.strokeStyle = (maxed || equipped) ? '#ffd54a' : can ? '#6fd36f' : '#556'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 10); ctx.fill(); ctx.stroke();
@@ -2478,6 +2590,9 @@ const SKILL_STATS = {
                           : [['보석 흡수 범위 증가', 25*l, '%'], ['자석 경험치 보너스', Math.min(100, 15*l), '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
   vampire:  l => l >= 7 ? [['구체 수', 9, '개'], ['구체 피해', 40, 'dmg'], ['처치 시 회복', 5, ''], ['구체 쿨타임', 0.76, 'cd'], ['오라 반경', 190, ''], ['흡수 피해(0.4초마다)', 28, 'dmg'], ['흡수 체력 회복', 10, '%'], ['초당 최대 회복', 30, '']]
                           : [['구체 수', 2 + l, '개'], ['피해', 12 + 4*l, 'dmg'], ['처치 시 회복', 5, ''], ['쿨타임', 1.6 - 0.12*l, 'cd']],
+  sonic:    l => [['파동 수', l >= 7 ? 3 : l >= 4 ? 2 : 1, '회'], ['피해', l >= 7 ? 90 : 14 + 6*l, 'dmg'], ['범위(반경)', l >= 7 ? 420 : 150 + 22*l, ''], ['밀어내기', l >= 7 ? 700 : 430, ''], ['쿨타임', l >= 7 ? 1.4 : 2.2 - 0.12*l, 'cd']],
+  fireball: l => [['불덩이 수', l >= 7 ? 5 : 1 + Math.floor(l / 2), '개'], ['폭발 피해', l >= 7 ? 150 : 30 + 12*l, 'dmg'], ['폭발 반경', l >= 7 ? 130 : 50 + 8*l, ''], ['쿨타임', l >= 7 ? 1.0 : 1.4 - 0.08*l, 'cd']],
+  emfield:  l => [['번개 줄기', l >= 7 ? 14 : 2 + l, '개'], ['피해', l >= 7 ? 55 : 12 + 5*l, 'dmg'], ['사거리', l >= 7 ? 360 : 160 + 20*l, ''], ['연쇄', l >= 4 ? '60% 피해' : '없음'], ['쿨타임', l >= 7 ? 0.3 : 0.7 - 0.04*l, 'cd']],
   dmgup:    l => [['모든 공격력 증가', 5*l, '%']],
 };
 const fmtN = v => String(Math.round(v * 100) / 100);
@@ -2561,8 +2676,13 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.12.2';
+const VERSION = '2.0.0';
 const CHANGELOG = [
+  { v:'2.0.0', date:'2026-11-28', items:[
+    '맵 선택 화면 추가: 1번 맵에서 죽음의 군주를 쓰러뜨리면 2번 맵 "붉은 고원" 해금',
+    '붉은 고원 전용 스킬: 음파(피해+밀어내기), 파이어볼, 전자기장 (보조 스킬은 공통)',
+    '고원 상점: 장비 별도 성장, 전용 스킬 확률, 전용 캐릭터 3종 (골드는 공통)',
+  ] },
   { v:'1.12.2', date:'2026-11-28', items:[
     '뱀파이어 오라(최대 레벨)에서도 흡혈 구체 발사 유지 (구체 9개, 피해 40)',
   ] },
@@ -2729,18 +2849,19 @@ function drawCodex() {
   const v0 = 96, v1 = H - 70, cw = 150, ch = 128, gap = 12, cols = Math.max(1, Math.min(6, Math.floor((W - 30 + gap) / (cw + gap))));
   const x0 = W/2 - (cols * cw + (cols - 1) * gap) / 2;
   ctx.save(); ctx.beginPath(); ctx.rect(0, v0, W, v1 - v0); ctx.clip();
-  WEAPON_KEYS.forEach((k, i) => {
+  const keysShown = WEAPON_KEYS.filter(k => codexFrom === 'title' ? (SAVE.cleared1 || inMap(k, 1)) : inMap(k, MAPID));
+  keysShown.forEach((k, i) => {
     const u = UPGRADES[k], x = x0 + (i % cols) * (cw + gap), y = v0 + 8 + Math.floor(i / cols) * (ch + gap) - cxScroll;
     const lv = codexFrom === 'title' || !P ? 0 : P.w[k], hv = mouse.x >= x && mouse.x <= x + cw && mouse.y >= y && mouse.y <= y + ch && mouse.y > v0 && mouse.y < v1;
     ctx.fillStyle = hv ? '#3a4a6a' : lv ? '#2d3d5c' : '#26304a'; ctx.strokeStyle = lv ? '#ffd54a' : '#556'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 10); ctx.fill(); ctx.stroke();
     icon(u.icon, x + cw/2, y + 42, 52);
-    text(u.name, x + cw/2, y + 84, 16, '#fff');
+    text(u.name, x + cw/2, y + 84, 16, u.map === 2 ? '#ffab91' : '#fff');
     text(lv ? (lv >= MAXLV && u.evo ? 'MAX' : 'Lv ' + lv) + ' 보유' : u.evo ? '진화: ' + u.evo.name : '레벨 무제한', x + cw/2, y + 106, 12, lv ? '#9fe29f' : '#9fb3c8');
     if (y + ch > v0 && y < v1) btns.push({ x, y, w:cw, h:ch, y0:v0, y1:v1, fn:() => { infoKey = k; infoSel = 1; infoFrom = 'codex'; state = 'info'; } });
   });
   ctx.restore();
-  const rows = Math.ceil(WEAPON_KEYS.length / cols);
+  const rows = Math.ceil(keysShown.length / cols);
   cxMax = Math.max(0, rows * (ch + gap) + 16 - (v1 - v0));
   cxScroll = Math.max(0, Math.min(cxMax, cxScroll));
   if (cxMax > 0) {
@@ -2894,6 +3015,44 @@ function drawAuth() {
   button('돌아가기 [Esc]', x, by + 172, cw, 38, () => { state = 'title'; }, '#7a2e2e');
   if (signup) text('아이디·비밀번호는 이 브라우저에만 저장됩니다 (서버 없음)', W/2, y + ch - 12, 12, '#9fb3c8');
 }
+let mapMsg = '';
+function openMaps() { state = 'maps'; mapMsg = ''; }
+function selectMap(m) {
+  if (m === 2 && !SAVE.cleared1) { mapMsg = '1번 맵에서 죽음의 군주를 쓰러뜨리면 열립니다'; return; }
+  MAPID = m; start();
+}
+const MAPS = [
+  { id:1, name:'초원',      desc:'첫 번째 맵', c1:'#8ad45a', c2:'#80cc52', skills:'쿠나이, 수리검, 방어막 등' },
+  { id:2, name:'붉은 고원',  desc:'어둡고 붉은 회색 고원', c1:'#4d3d40', c2:'#47383b', skills:'음파, 파이어볼, 전자기장' },
+];
+function drawMaps() {
+  ctx.fillStyle = '#16202c'; ctx.fillRect(0, 0, W, H);
+  text('맵 선택', W/2, Math.max(60, H/2 - 190), 42, '#ffd54a');
+  const cw = Math.min(300, (W - 50) / 2), ch = 280, gap = 20, x0 = W/2 - cw - gap/2, y = H/2 - 140;
+  MAPS.forEach((m, i) => {
+    const x = x0 + i * (cw + gap), open = m.id === 1 || SAVE.cleared1;
+    const hv = open && mouse.x >= x && mouse.x <= x + cw && mouse.y >= y && mouse.y <= y + ch;
+    ctx.fillStyle = hv ? '#34506e' : '#26384f'; ctx.strokeStyle = open ? (m.id === 2 ? '#e57373' : '#6fd36f') : '#556'; ctx.lineWidth = hv ? 5 : 3;
+    ctx.beginPath(); ctx.roundRect(x, y, cw, ch, 14); ctx.fill(); ctx.stroke();
+    const px = x + 16, py = y + 16, pw = cw - 32, ph = 130, t = pw / 6;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) { ctx.fillStyle = (r + c) & 1 ? m.c1 : m.c2; ctx.fillRect(px + c*t, py + r*ph/3, t + 1, ph/3 + 1); }
+    if (m.id === 2) { ctx.strokeStyle = '#a8362f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px + 20, py + 30); ctx.lineTo(px + 70, py + 55); ctx.lineTo(px + 90, py + 100); ctx.moveTo(px + pw - 30, py + 20); ctx.lineTo(px + pw - 70, py + 60); ctx.lineTo(px + pw - 55, py + 110); ctx.stroke(); }
+    if (open) icon(m.id === 2 ? 'striker' : 'ninja', x + cw/2, py + ph/2, 64);
+    else {   // 자물쇠
+      ctx.fillStyle = '#000a'; ctx.fillRect(px, py, pw, ph);
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(x + cw/2, py + ph/2 - 10, 20, Math.PI, 0); ctx.stroke();
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.roundRect(x + cw/2 - 28, py + ph/2 - 10, 56, 44, 6); ctx.fill();
+      ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(x + cw/2, py + ph/2 + 8, 6, 0, 7); ctx.fill();
+    }
+    text((i + 1) + '. ' + m.name, x + cw/2, y + 178, 22, open ? '#fff' : '#8fa3b8');
+    text(m.desc, x + cw/2, y + 204, 13, '#c9d6e6');
+    text(m.skills, x + cw/2, y + 226, 12, '#9fe29f');
+    text(open ? '시작하기' : '잠김', x + cw/2, y + 260, 17, open ? '#ffd54a' : '#e57373');
+    btns.push({ x, y, w:cw, h:ch, fn:() => selectMap(m.id) });
+  });
+  if (mapMsg) text(mapMsg, W/2, y + ch + 34, 16, '#ff8a80');
+  button('돌아가기 [Esc]', W/2 - 90, y + ch + 52, 180, 42, () => { state = 'title'; }, '#475569');
+}
 function drawPause() {
   ctx.fillStyle = '#000a'; ctx.fillRect(0, 0, W, H);
   text('일시정지', W/2, H/2 - 70, 46, '#ffd54a');
@@ -2907,6 +3066,7 @@ function drawWin() {
   ctx.fillStyle = '#000c'; ctx.fillRect(0, 0, W, H);
   text('VICTORY!', W/2, H/2 - 90, 60, '#ffd54a');
   text('죽음의 군주를 쓰러뜨렸습니다!', W/2, H/2 - 50, 22, '#fff');
+  if (P.unlockedNew) text('★ 새 맵 "붉은 고원" 해금! ★', W/2, H/2 - 150, 24, '#ff8a65');
   const m = Math.floor(time/60), s = Math.floor(time%60);
   text('생존 ' + m + '분 ' + s + '초  ·  처치 ' + kills + '  ·  Lv.' + P.level, W/2, H/2 - 14, 20);
   icon('coin', W/2 - 90, H/2 + 24, 24); text('+' + (P.earned || 0) + ' 골드 (클리어 보너스 +1000 포함)', W/2 - 72, H/2 + 32, 18, '#ffd54a', 'left');
@@ -2937,7 +3097,7 @@ function drawTitle() {
   button('PC', 20, 40, 80, 40, () => setMode('pc'), MODE === 'pc' ? '#e0932b' : '#475569');
   button('모바일', 106, 40, 90, 40, () => setMode('mobile'), MODE === 'mobile' ? '#e0932b' : '#475569');
   icon('coin', W/2 - 56, H/2 + 56, 22); text(String(SAVE.gold), W/2 - 40, H/2 + 63, 20, '#ffd54a', 'left');
-  button('시작 [Enter]', W/2 - 170, H/2 + 85, 160, 48, start, '#2f9e5b');
+  button('시작 [Enter]', W/2 - 170, H/2 + 85, 160, 48, openMaps, '#2f9e5b');
   button('상점 [S]', W/2 + 10, H/2 + 85, 160, 48, openShop, '#e0932b');
   icon(charIcon(), W/2, H/2 + 225, 64);
   text('v' + VERSION, 14, H - 16, 14, '#ffffffaa', 'left');
@@ -2965,6 +3125,7 @@ function loop(now) {
   else if (state === 'codex') drawCodex();
   else if (state === 'bestiary') drawBestiary();
   else if (state === 'auth') drawAuth();
+  else if (state === 'maps') drawMaps();
   else {
     if (state === 'play') update(dt);
     drawWorld(); drawHUD();
