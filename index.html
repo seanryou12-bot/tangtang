@@ -2379,8 +2379,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.8.2';
+const VERSION = '1.8.3';
 const CHANGELOG = [
+  { v:'1.8.3', date:'2026-11-28', items:[
+    '로그인/가입 창 아래쪽 버튼이 창 밖으로 삐져나오던 문제 수정',
+  ] },
   { v:'1.8.2', date:'2026-11-28', items:[
     '상점 스킬 확률 카드의 설명 글자가 카드 밖으로 삐져나오던 문제 수정',
   ] },
@@ -2614,7 +2617,7 @@ async function authSubmit() {
 function drawAuth() {
   ctx.fillStyle = '#1b2a3a'; ctx.fillRect(0, 0, W, H);
   const signup = AUTH.mode === 'signup', cw = Math.min(420, W - 30), x = W/2 - cw/2, fl = authFields();
-  const ch = 150 + fl.length * 74 + 120, y = Math.max(10, H/2 - ch/2);
+  const ch = 150 + fl.length * 74 + 170, y = Math.max(10, H/2 - ch/2);
   ctx.fillStyle = '#26384f'; ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x - 20, y, cw + 40, ch, 14); ctx.fill(); ctx.stroke();
   text(signup ? '계정 만들기' : '로그인', W/2, y + 52, 34, '#ffd54a');
   const labels = { name:'아이디 (영문·숫자·_ 2~16자)', pw:'비밀번호 (4자 이상)', pw2:'비밀번호 확인' };
