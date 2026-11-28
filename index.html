@@ -219,7 +219,7 @@ const UPGRADES = {
   kunai:    { name:'쿠나이',     icon:'kunai', desc: l => l===0 ? '가장 가까운 적에게 쿠나이를 던진다' : '쿠나이 개수·공격속도·데미지 증가',
               evo:{ name:'쿠나이 난무', icon:'kunaiEvo', desc:'사방 12방향으로 관통 쿠나이를 흩뿌린다' } },
   shuriken: { name:'수리검',     icon:'shuriken', desc: l => l===0 ? '날아갔다가 돌아오는 관통 수리검' : '레벨마다 수리검 +1개(최대 6개), 사거리·크기·피해 증가',
-              evo:{ name:'풍마 수리검', icon:'shurikenEvo', desc:'거대 수리검 6개가 플레이어 주변을 공전하며 나갔다 돌아온다' } },
+              evo:{ name:'폭렬수리검', icon:'shurikenEvo', desc:'거대 수리검 6개가 플레이어 주변을 공전하며 나갔다 돌아오고, 지나가는 길마다 폭발을 일으킨다' } },
   shield:   { name:'방어막',     icon:'shield', desc: l => l===0 ? '주변에 방어막 필드 생성: 안의 적은 느려지고 피해를 입으며, 받는 피해 30% 감소' : '방어막 범위(크게)·적 둔화(25→40%)·받는 피해 감소(30→60%)·피해 증가',
               evo:{ name:'가시 방어막', icon:'shieldEvo', desc:'거대한 방어막, 적을 크게 둔화시키고 안의 적에게 가시 피해' } },
   guardian: { name:'수호자',     icon:'gear', desc: l => l===0 ? '플레이어 주위를 도는 톱니바퀴 수호자 1개' : '수호자 +1, 회전속도·크기·피해 증가',
@@ -893,6 +893,13 @@ function updateProjs(dt) {
       const d = p.R * Math.sin(Math.PI * Math.min(1, p.t / p.T));
       const ang = p.a + (p.orbit ? p.t * 3.4 : 0);   // 만렙: 나가고 들어오면서 플레이어 주위를 공전
       p.x = P.x + Math.cos(ang) * d; p.y = P.y + Math.sin(ang) * d;
+      if (p.orbit) {                                    // 폭렬수리검: 지나가는 길마다 폭발
+        p.boomT = (p.boomT || 0) - dt;
+        if (p.boomT <= 0 && d > 30) {
+          p.boomT = 0.2; explode(p.x, p.y, 70, 50, '#fb923c');
+          for (let i = 0; i < 5; i++) particles.push({ s:rand(2, 5), x:p.x, y:p.y, vx:rand(-170,170), vy:rand(-170,170), t:0.3, c:['#ef4444','#fb923c','#fde047'][i % 3] });
+        }
+      }
       if (p.t >= p.T) p.life = 0;
       for (const e of enemies) {
         if (e.hp <= 0) continue;
@@ -2074,7 +2081,7 @@ function drawWorld() {
       if (p.evo) { ctx.shadowColor = '#f6f'; ctx.shadowBlur = 10; ln(p.x - p.vx*0.04, p.y - p.vy*0.04, p.x, p.y, '#f6f', 7); ln(p.x - p.vx*0.04, p.y - p.vy*0.04, p.x, p.y, '#fff', 3); ctx.shadowBlur = 0; }
       else { ctx.fillStyle = '#ff6'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
     } else if (p.kind === 'shuriken') {
-      if (p.r > 30) { ctx.shadowColor = '#7dd3fc'; ctx.shadowBlur = 18; star(p.x, p.y, p.r, p.spin, '#8cf'); ctx.shadowBlur = 0; star(p.x, p.y, p.r*0.65, -p.spin*1.3, '#e8f7ff'); }
+      if (p.r > 30) { ctx.shadowColor = '#f97316'; ctx.shadowBlur = 18; star(p.x, p.y, p.r, p.spin, '#fb923c'); ctx.shadowBlur = 0; star(p.x, p.y, p.r*0.65, -p.spin*1.3, '#fde68a'); }
       else star(p.x, p.y, p.r, p.spin, '#cde');
     } else if (p.kind === 'ball') {
       shadow(p.x, p.y + p.r, p.r);
@@ -2384,7 +2391,7 @@ function wrapText(str, x, y, maxW, lh, col) {
 const SKILL_STATS = {
   kunai:    l => l >= 7 ? [['개수', 12, '개'], ['피해', 40, 'dmg'], ['쿨타임', 0.55, 'cd'], ['관통', 3, '회']]
                           : [['개수', l, '개'], ['피해', 10 + 2*l, 'dmg'], ['쿨타임', Math.max(0.3, 0.9 - 0.08*l), 'cd'], ['관통', l >= 3 ? 1 : 0, '회']],
-  shuriken: l => l >= 7 ? [['개수', 6, '개'], ['피해', 150, 'dmg'], ['사거리', 330, ''], ['크기', 38, ''], ['쿨타임', 2.6, 'cd']]
+  shuriken: l => l >= 7 ? [['개수', 6, '개'], ['피해', 150, 'dmg'], ['사거리', 330, ''], ['크기', 38, ''], ['폭발 피해(0.2초마다)', 50, 'dmg'], ['폭발 반경', 70, ''], ['쿨타임', 2.6, 'cd']]
                           : [['개수', l, '개'], ['피해', 14 + 4*l, 'dmg'], ['사거리', 130 + 32*l, ''], ['크기', 14 + 2.5*l, ''], ['쿨타임', 2.2 - 0.12*l, 'cd']],
   shield:   l => [['범위(반경)', l >= 7 ? 340 : 60 + 30*l, ''], ['적 둔화', 25 + 2.5*(Math.min(l, 7) - 1), '%'], ['피해(0.4초마다)', l >= 7 ? 45 : 6 + 5*l, 'dmg'], ['받는 피해 감소', 30 + 5*(Math.min(l, 7) - 1), '%']],
   guardian: l => l >= 7 ? [['개수', 6, '개'], ['피해', 60, 'dmg'], ['회전속도', 6.5, ''], ['크기', 27, ''], ['궤도 반경', 115, '']]
@@ -2487,8 +2494,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.10.3';
+const VERSION = '1.11.0';
 const CHANGELOG = [
+  { v:'1.11.0', date:'2026-11-28', items:[
+    '풍마 수리검 → 폭렬수리검: 이동 경로는 그대로, 지나가는 길마다 폭발 (주황색 수리검)',
+  ] },
   { v:'1.10.3', date:'2026-11-28', items:[
     '불꽃 슈팅(축구공 최대 레벨): 불타는 공 3개 → 6개',
   ] },
