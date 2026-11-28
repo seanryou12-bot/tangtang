@@ -158,7 +158,7 @@ const UPGRADES = {
               evo:{ name:'쿠나이 난무', icon:'kunaiEvo', desc:'사방 12방향으로 관통 쿠나이를 흩뿌린다' } },
   shuriken: { name:'수리검',     icon:'shuriken', desc: l => l===0 ? '날아갔다가 돌아오는 관통 수리검' : '레벨마다 수리검 +1개(최대 6개), 사거리·크기·피해 증가',
               evo:{ name:'풍마 수리검', icon:'shurikenEvo', desc:'거대 수리검 6개가 플레이어 주변을 공전하며 나갔다 돌아온다' } },
-  shield:   { name:'방어막',     icon:'shield', desc: l => l===0 ? '주변에 방어막 필드 생성: 안의 적은 느려지고 피해를 입으며, 받는 피해 50% 감소' : '방어막 범위(크게)·적 둔화·피해 증가',
+  shield:   { name:'방어막',     icon:'shield', desc: l => l===0 ? '주변에 방어막 필드 생성: 안의 적은 느려지고 피해를 입으며, 받는 피해 30% 감소' : '방어막 범위(크게)·적 둔화(25→40%)·받는 피해 감소(30→60%)·피해 증가',
               evo:{ name:'가시 방어막', icon:'shieldEvo', desc:'거대한 방어막, 적을 크게 둔화시키고 안의 적에게 가시 피해' } },
   guardian: { name:'수호자',     icon:'gear', desc: l => l===0 ? '플레이어 주위를 도는 톱니바퀴 수호자 1개' : '수호자 +1, 회전속도·크기·피해 증가',
               evo:{ name:'수비자',     icon:'sawblade', desc:'붉은 원형 칼날 6개가 훨씬 빠르게 회전한다' } },
@@ -174,8 +174,8 @@ const UPGRADES = {
               evo:{ name:'비전서',     icon:'book', desc:'경험치 3배, 보석 흡수 범위 대폭 증가, 자석 아이템으로 모은 경험치는 추가로 3배' } },
   heart:    { name:'체력 증가',   icon:'heart', desc: l => l===0 ? '최대 체력 +100, 즉시 회복' : '최대 체력 +100 추가',
               evo:{ name:'불사의 심장', icon:'heartEvo', desc:'최대 체력 +200, 초당 5 재생, 사망 시 1회 부활' } },
-  clock:    { name:'쿨타임 감소', icon:'stopwatch', desc: l => l===0 ? '모든 무기 쿨타임 -7%' : '쿨타임 추가 감소',
-              evo:{ name:'시간 정지',   icon:'hourglass', desc:'쿨타임 -55%, 20초마다 적이 2.5초간 정지' } },
+  clock:    { name:'쿨타임 감소', icon:'stopwatch', desc: l => l===0 ? '모든 무기 쿨타임 -7%, 모든 적 2% 둔화' : '쿨타임 추가 감소, 모든 적 둔화 +2%',
+              evo:{ name:'시간 정지',   icon:'hourglass', desc:'쿨타임 -55%, 모든 적 20% 둔화, 20초마다 적이 2.5초간 정지' } },
   lightning:{ name:'번개',       icon:'lightning', desc: l => l===0 ? '하늘에서 적에게 번개가 내리친다' : '번개 횟수·피해·범위 증가',
               evo:{ name:'뇌신의 심판', icon:'lightningEvo', desc:'번개 8줄기가 폭풍처럼 쏟아진다' } },
   summoner: { name:'소환자',     icon:'summon', desc: l => l===0 ? '유령 정령을 소환해 적을 공격한다' : '새 정령 +1 (개구리→독수리→슬라임→말 탄 기사→드래곤), 뒤에 얻는 정령일수록 피해·속도 증가',
@@ -186,8 +186,8 @@ const UPGRADES = {
               evo:{ name:'앤빌',       icon:'anvil', desc:'거대한 앤빌 4개가 떨어져 큰 충격파를 일으킨다' } },
   drill:    { name:'드릴샷',     icon:'drill', desc: l => l===0 ? '화면 벽을 튕기며 계속 돌아다니는 드릴 1개' : '드릴 +1개, 크기·피해 증가',
               evo:{ name:'메가 드릴',   icon:'drillEvo', desc:'거대 드릴 6개, 벽에 튕길 때마다 충격파가 터진다' } },
-  magnet:   { name:'자석',       icon:'magnet', desc: l => l===0 ? '보석 흡수 범위 증가, 자석 아이템이 더 자주 드롭' : '흡수 범위·자석 드롭 확률 증가',
-              evo:{ name:'초강력 자석', icon:'magnetEvo', desc:'보석 흡수 범위 대폭 증가, 자석 드롭이 매우 잦아진다' } },
+  magnet:   { name:'자석',       icon:'magnet', desc: l => l===0 ? '보석 흡수 범위 증가, 자석 아이템이 더 자주 드롭' : '흡수 범위·자석 드롭 확률 증가, 자석으로 모은 경험치 보너스 (최대 +100%)',
+              evo:{ name:'초강력 자석', icon:'magnetEvo', desc:'보석 흡수 범위 대폭 증가(+400%), 자석 경험치 +100%, 자석 드롭이 매우 잦아진다' } },
   dmgup:    { name:'공격력 강화', icon:'powerup', desc: l => l===0 ? '모든 공격력 +5% (레벨 제한 없음)' : '모든 공격력 +5% 추가', evo:null },
   soccer:   { name:'축구공',     icon:'ball', desc: l => l===0 ? '적들 사이를 튕겨 다니는 축구공을 찬다' : '레벨마다 공 +1개, 공 크기·튕기는 횟수·피해 증가',
               evo:{ name:'불꽃 슈팅',   icon:'ballEvo', desc:'불타는 거대 축구공 3개가 15번씩 튕기며 폭발한다' } },
@@ -238,7 +238,10 @@ const speedOf = () => 180 * (1 + 0.03 * upLv('swift')) * (lvl('boots') >= 7 ? 2.
 const cdMul = () => lvl('clock') >= 7 ? 0.45 : 1 - 0.07 * lvl('clock');
 const xpMul = () => (lvl('scroll') >= 7 ? 3 : 1 + 0.2 * lvl('scroll')) * (1 + 0.05 * upLv('learn'));
 const shieldR = () => lvl('shield') >= 7 ? 340 : 60 + 30 * lvl('shield');          // 방어막 반경
-const shieldSlow = () => lvl('shield') >= 7 ? 0.65 : 0.25 + 0.05 * lvl('shield');   // 적 둔화율
+const shieldSlow = () => 0.25 + 0.025 * (Math.min(lvl('shield'), 7) - 1);   // 적 둔화율 25% → 40% (레벨 1~7)
+const shieldDR = () => 0.30 + 0.05 * (Math.min(lvl('shield'), 7) - 1);      // 받는 피해 감소 30% → 60%
+const clockSlow = () => lvl('clock') >= 7 ? 0.20 : 0.02 * lvl('clock');       // 모든 적 둔화 2%/레벨, 최대 20%
+const magnetXpBonus = () => lvl('magnet') >= 7 ? 1.0 : Math.min(1.0, 0.15 * lvl('magnet'));   // 자석으로 모은 경험치 보너스 최대 +100%
 const calcMaxHp = () => 100 + 5 * (P.level - 1) + 10 * upLv('vitality') + 100 * Math.min(lvl('heart'), 6) + (lvl('heart') >= 7 ? 200 : 0);
 
 // ---------- 레벨업 ----------
@@ -456,7 +459,7 @@ function goldDrop(e) {
 function hurtPlayer(d) {
   if (P.inv > 0) return;
   d *= 1 - 0.04 * upLv('armor');               // 상점 갑옷
-  if (lvl('shield')) d *= 0.5;                 // 방어막: 받는 피해 50% 감소
+  if (lvl('shield')) d *= 1 - shieldDR();      // 방어막: 받는 피해 30%→60% 감소
   P.hp -= d; P.hurtT = 0.2;
   if (P.hp <= 0) {
     if ((lvl('heart') >= 7 || P.extraRevive) && !P.revived) {
@@ -932,7 +935,7 @@ function update(dt) {
     if (!frozen) {
       const dashing = e.boss ? bossAI(e, dt) : false;
       if (!dashing) { const slow = lvl('shield') && d < shieldR() + e.r ? 1 - shieldSlow() : 1;
-        const mv = (e.ranged && d < 260 ? 0 : 1) * slow; e.x += (P.x - e.x)/d * e.speed * dt * mv; e.y += (P.y - e.y)/d * e.speed * dt * mv; }
+        const mv = (e.ranged && d < 260 ? 0 : 1) * slow * (1 - clockSlow()); e.x += (P.x - e.x)/d * e.speed * dt * mv; e.y += (P.y - e.y)/d * e.speed * dt * mv; }
       if (e.ranged) { e.fireT -= dt; if (e.fireT <= 0 && d < 520) { e.fireT = 5.5; ebullets.push({ x:e.x, y:e.y, vx:(P.x-e.x)/d*230, vy:(P.y-e.y)/d*230, life:4, r:8, dmg:e.dmg, green:true }); } }
     }
     e.x += e.kx * dt; e.y += e.ky * dt;
@@ -975,11 +978,11 @@ function update(dt) {
   ebullets = ebullets.filter(b => b.life > 0);
 
   // 보석
-  const magnet = (lvl('magnet') >= 7 ? 700 : (80 + P.level * 2) * (1 + 0.25 * lvl('magnet'))) + (lvl('scroll') >= 7 ? 320 : 0);   // 비전서 + 자석 범위가 합산
+  const magnet = ((80 + P.level * 2) * (lvl('magnet') >= 7 ? 5 : 1 + 0.25 * lvl('magnet'))) + (lvl('scroll') >= 7 ? 320 : 0);   // 비전서 + 자석 범위가 합산
   for (const g of gems) {
     const d = Math.hypot(P.x - g.x, P.y - g.y) || 1;
     if (d < magnet || g.pull) { g.pull = true; g.x += (P.x-g.x)/d * 420 * dt; g.y += (P.y-g.y)/d * 420 * dt; }
-    if (d < P.r + 6) { g.dead = true; gainXp(g.v * (g.mag ? 3 : 1)); }
+    if (d < P.r + 6) { g.dead = true; gainXp(g.v * (g.magX || 1)); }
   }
   gems = gems.filter(g => !g.dead);
   if (gems.length > 600) gems.splice(0, gems.length - 600);
@@ -992,7 +995,8 @@ function update(dt) {
   for (const it of items) if (dist2(P, it) < (P.r + 16)**2) {
     it.dead = true;
     if (it.kind === 'meat') { P.hp = Math.min(P.maxHp, P.hp + 30); floaters.push({ x:P.x, y:P.y - 20, txt:'+30', t:0.8 }); }
-    else if (it.kind === 'magnet') { const bonus = lvl('scroll') >= 7; for (const g of gems) { g.pull = true; if (bonus) g.mag = true; } if (bonus) floaters.push({ x:P.x, y:P.y - 40, txt:'비전서! 경험치 x3', t:1.2, gold:true }); for (const i of items) if (i.kind === 'coin') i.pull = true; }
+    else if (it.kind === 'magnet') { const bonus = lvl('scroll') >= 7, mb = magnetXpBonus(), mulX = (bonus ? 3 : 1) * (1 + mb); for (const g of gems) { g.pull = true; if (mulX > 1) g.magX = mulX; }
+      const parts = []; if (mb > 0) parts.push('자석 +' + Math.round(mb * 100) + '%'); if (bonus) parts.push('비전서 x3'); if (parts.length) floaters.push({ x:P.x, y:P.y - 40, txt:'경험치 ' + parts.join(' · '), t:1.2, gold:true }); for (const i of items) if (i.kind === 'coin') i.pull = true; }
     else if (it.kind === 'coin') { P.gold += it.v; SAVE.gold += it.v; persist(); floaters.push({ x:P.x, y:P.y - 24, txt:'+' + it.v, t:0.7, gold:true }); }
     else if (it.kind === 'chest') P.pending++;
   }
@@ -2273,7 +2277,7 @@ const SKILL_STATS = {
                           : [['개수', l, '개'], ['피해', 10 + 2*l, 'dmg'], ['쿨타임', Math.max(0.3, 0.9 - 0.08*l), 'cd'], ['관통', l >= 3 ? 1 : 0, '회']],
   shuriken: l => l >= 7 ? [['개수', 6, '개'], ['피해', 150, 'dmg'], ['사거리', 330, ''], ['크기', 38, ''], ['쿨타임', 2.6, 'cd']]
                           : [['개수', l, '개'], ['피해', 14 + 4*l, 'dmg'], ['사거리', 130 + 32*l, ''], ['크기', 14 + 2.5*l, ''], ['쿨타임', 2.2 - 0.12*l, 'cd']],
-  shield:   l => [['범위(반경)', l >= 7 ? 340 : 60 + 30*l, ''], ['적 둔화', l >= 7 ? 65 : 25 + 5*l, '%'], ['피해(0.4초마다)', l >= 7 ? 45 : 6 + 5*l, 'dmg'], ['받는 피해 감소', 50, '%']],
+  shield:   l => [['범위(반경)', l >= 7 ? 340 : 60 + 30*l, ''], ['적 둔화', 25 + 2.5*(Math.min(l, 7) - 1), '%'], ['피해(0.4초마다)', l >= 7 ? 45 : 6 + 5*l, 'dmg'], ['받는 피해 감소', 30 + 5*(Math.min(l, 7) - 1), '%']],
   guardian: l => l >= 7 ? [['개수', 6, '개'], ['피해', 60, 'dmg'], ['회전속도', 6.5, ''], ['크기', 27, ''], ['궤도 반경', 115, '']]
                           : [['개수', l, '개'], ['피해', 20 + 6*l, 'dmg'], ['회전속도', 3 + 0.3*l, ''], ['크기', 11 + l, ''], ['궤도 반경', 70 + 3*l, '']],
   molotov:  l => [['던지는 개수', l >= 7 ? 3 : l >= 4 ? 2 : 1, '개'], ['불바다 반경', l >= 7 ? 210 : 70 + 12*l, ''], ['지속시간', l >= 7 ? 5 : 3, '초'], ['피해(0.3초마다)', l >= 7 ? 60 : 12 + 6*l, 'dmg'], ['쿨타임', l >= 7 ? 1.3 : 2.4 - 0.2*l, 'cd']],
@@ -2282,15 +2286,15 @@ const SKILL_STATS = {
   boots:    l => l >= 7 ? [['이동속도', 220, '%'], ['접촉 피해(0.2초마다)', 20, 'dmg']] : [['이동속도', 100 + 12*l, '%']],
   scroll:   l => l >= 7 ? [['경험치 획득', 300, '%'], ['보석 흡수 범위', '+320']] : [['경험치 획득', 100 + 20*l, '%']],
   heart:    l => [['최대 체력 증가', l >= 7 ? 800 : 100*l, ''], ['재생', l >= 7 ? 5 : 0, '/초'], ['부활', l >= 7 ? '1회' : '-']],
-  clock:    l => l >= 7 ? [['쿨타임 감소', 55, '%'], ['시간 정지', '20초마다 2.5초']] : [['쿨타임 감소', 7*l, '%']],
+  clock:    l => l >= 7 ? [['쿨타임 감소', 55, '%'], ['모든 적 둔화', 20, '%'], ['시간 정지', '20초마다 2.5초']] : [['쿨타임 감소', 7*l, '%'], ['모든 적 둔화', 2*l, '%']],
   lightning:l => [['번개 수', l >= 7 ? 8 : 1 + Math.floor(l/2), '줄기'], ['피해', l >= 7 ? 150 : 30 + 12*l, 'dmg'], ['범위', l >= 7 ? 90 : 45 + 5*l, ''], ['쿨타임', l >= 7 ? 1.4 : 2.4 - 0.18*l, 'cd']],
   summoner: l => [['정령 수', l >= 7 ? '6 + 골렘' : l, l >= 7 ? '' : '기'], ['정령 피해(기본)', l >= 7 ? 45 : 14 + 6*l, 'dmg'], ['이동속도', l >= 7 ? 230 : 150 + 10*l, ''], ['정령별 능력', '아래 정령별 정보 참고']],
   laser:    l => [['빔 수', l >= 7 ? 4 : l >= 4 ? 2 : 1, '줄기'], ['피해(0.12초마다)', l >= 7 ? 70 : 22 + 9*l, 'dmg'], ['굵기', l >= 7 ? 44 : 12 + 3*l, ''], ['지속', l >= 7 ? 2.8 : 0.5, '초'], ['쿨타임', l >= 7 ? 5 : 3.4 - 0.22*l, 'cd']],
   brick:    l => [['개수', l >= 7 ? 4 : 1 + Math.ceil(l/2), '개'], ['피해', l >= 7 ? 220 : 35 + 14*l, 'dmg'], ['폭발 반경', l >= 7 ? 115 : 40 + 5*l, ''], ['쿨타임', l >= 7 ? 2 : 2.8 - 0.22*l, 'cd']],
   drill:    l => [['드릴 수', l >= 7 ? 6 : l, '개'], ['피해(0.25초마다)', l >= 7 ? 60 : 12 + 5*l, 'dmg'], ['크기', l >= 7 ? 34 : 14 + 1.5*l, ''], ['충격파', l >= 7 ? '튕길 때 폭발' : '-']],
   soccer:   l => [['공 수', l >= 7 ? 3 : l, '개'], ['피해', l >= 7 ? 90 : 15 + 6*l, 'dmg'], ['튕김 횟수', l >= 7 ? 15 : 3 + l, '회'], ['크기', l >= 7 ? 34 : 11 + 2.5*l, ''], ['쿨타임', l >= 7 ? 2.2 : 2.6 - 0.18*l, 'cd']],
-  magnet:   l => l >= 7 ? [['보석 흡수 범위', 700, ''], ['드롭 중 자석 비율', 90, '%'], ['고기/자석 드롭 간격', 35, '%']]
-                          : [['보석 흡수 범위 증가', 25*l, '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
+  magnet:   l => l >= 7 ? [['보석 흡수 범위 증가', 400, '%'], ['자석 경험치 보너스', 100, '%'], ['드롭 중 자석 비율', 90, '%'], ['고기/자석 드롭 간격', 35, '%']]
+                          : [['보석 흡수 범위 증가', 25*l, '%'], ['자석 경험치 보너스', Math.min(100, 15*l), '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
   dmgup:    l => [['모든 공격력 증가', 5*l, '%']],
 };
 const fmtN = v => String(Math.round(v * 100) / 100);
@@ -2374,8 +2378,14 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.7.1';
+const VERSION = '1.8.0';
 const CHANGELOG = [
+  { v:'1.8.0', date:'2026-11-28', items:[
+    '방어막: 받는 피해 감소 30%→60%, 적 둔화 25%→40%로 레벨에 따라 서서히 상승',
+    '자석: 자석 아이템으로 모은 경험치 보너스 추가 (레벨당 +15%, 최대 +100%)',
+    '초강력 자석 흡수 범위를 "+400%" 증가율 표기로 통일',
+    '쿨타임 감소: 모든 적을 레벨당 2% 둔화, 최대 레벨 20%',
+  ] },
   { v:'1.7.1', date:'2026-11-27', items:[
     '비전서(닌자 스크롤 7레벨)를 가지면 자석 아이템으로 모은 경험치가 추가로 3배',
   ] },
