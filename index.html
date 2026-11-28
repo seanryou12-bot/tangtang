@@ -252,7 +252,7 @@ const UPGRADES = {
               evo:{ name:'초강력 자석', icon:'magnetEvo', desc:'보석 흡수 범위 대폭 증가(+400%), 자석 경험치 +100%, 자석 드롭이 매우 잦아진다' } },
   dmgup:    { name:'공격력 강화', icon:'powerup', desc: l => l===0 ? '모든 공격력 +5% (레벨 제한 없음)' : '모든 공격력 +5% 추가', evo:null },
   soccer:   { name:'축구공',     icon:'ball', desc: l => l===0 ? '적들 사이를 튕겨 다니는 축구공을 찬다' : '레벨마다 공 +1개, 공 크기·튕기는 횟수·피해 증가',
-              evo:{ name:'불꽃 슈팅',   icon:'ballEvo', desc:'불타는 거대 축구공 3개가 15번씩 튕기며 폭발한다' } },
+              evo:{ name:'불꽃 슈팅',   icon:'ballEvo', desc:'불타는 거대 축구공 6개가 15번씩 튕기며 폭발한다' } },
 };
 const WEAPON_KEYS = Object.keys(UPGRADES);
 const powerLv = () => WEAPON_KEYS.reduce((a, k) => a + P.w[k], 0);
@@ -620,7 +620,7 @@ function updateDrills(dt) {
 }
 function kickBall() {
   const t = nearest(P, enemies, 600); if (!t) return false;
-  const lv = lvl('soccer'), evo = lv >= 7, n = evo ? 3 : lv;
+  const lv = lvl('soccer'), evo = lv >= 7, n = evo ? 6 : lv;
   const cands = enemies.filter(e => dist2(P, e) < 600*600);
   for (let i = 0; i < n; i++)
     projs.push({ kind:'ball', x:P.x, y:P.y, target:i === 0 ? t : cands[Math.floor(Math.random() * cands.length)], last:null,
@@ -910,7 +910,7 @@ function updateProjs(dt) {
       const dx = p.target.x - p.x, dy = p.target.y - p.y, d = Math.hypot(dx, dy) || 1;
       p.x += dx/d*p.spd*dt; p.y += dy/d*p.spd*dt;
       p.a = Math.atan2(dy, dx);
-      if (p.evo) for (let i = 0; i < 6; i++) {   // 불꽃 슈팅: 진행 방향의 반대쪽으로 픽셀 불꽃
+      if (p.evo) for (let i = 0; i < 4; i++) {   // 불꽃 슈팅: 진행 방향의 반대쪽으로 픽셀 불꽃
         const back = p.a + Math.PI + rand(-0.45, 0.45), v = rand(80, 300);
         particles.push({ s:rand(2.5, 7), x:p.x - dx/d*p.r*0.8 + rand(-8,8), y:p.y - dy/d*p.r*0.8 + rand(-8,8), vx:Math.cos(back)*v, vy:Math.sin(back)*v, t:rand(0.2, 0.4), c:['#ef4444','#fb923c','#fde047'][i % 3] });
       } else particles.push({ x:p.x, y:p.y, vx:0, vy:0, t:0.2, c:'#fff' });
@@ -2401,7 +2401,7 @@ const SKILL_STATS = {
   laser:    l => [['빔 수', l >= 7 ? 4 : l >= 4 ? 2 : 1, '줄기'], ['피해(0.12초마다)', l >= 7 ? 70 : 22 + 9*l, 'dmg'], ['굵기', l >= 7 ? 44 : 12 + 3*l, ''], ['지속', l >= 7 ? 2.8 : 0.5, '초'], ['쿨타임', l >= 7 ? 5 : 3.4 - 0.22*l, 'cd']],
   brick:    l => [['개수', l >= 7 ? 4 : 1 + Math.ceil(l/2), '개'], ['피해', l >= 7 ? 220 : 35 + 14*l, 'dmg'], ['폭발 반경', l >= 7 ? 115 : 40 + 5*l, ''], ['쿨타임', l >= 7 ? 2 : 2.8 - 0.22*l, 'cd']],
   drill:    l => [['드릴 수', l >= 7 ? 6 : l, '개'], ['피해(0.25초마다)', l >= 7 ? 60 : 12 + 5*l, 'dmg'], ['크기', l >= 7 ? 34 : 14 + 1.5*l, ''], ['충격파', l >= 7 ? '튕길 때 폭발' : '-']],
-  soccer:   l => [['공 수', l >= 7 ? 3 : l, '개'], ['피해', l >= 7 ? 90 : 15 + 6*l, 'dmg'], ['튕김 횟수', l >= 7 ? 15 : 3 + l, '회'], ['크기', l >= 7 ? 34 : 11 + 2.5*l, ''], ['쿨타임', l >= 7 ? 2.2 : 2.6 - 0.18*l, 'cd']],
+  soccer:   l => [['공 수', l >= 7 ? 6 : l, '개'], ['피해', l >= 7 ? 90 : 15 + 6*l, 'dmg'], ['튕김 횟수', l >= 7 ? 15 : 3 + l, '회'], ['크기', l >= 7 ? 34 : 11 + 2.5*l, ''], ['쿨타임', l >= 7 ? 2.2 : 2.6 - 0.18*l, 'cd']],
   magnet:   l => l >= 7 ? [['보석 흡수 범위 증가', 400, '%'], ['자석 경험치 보너스', 100, '%'], ['드롭 중 자석 비율', 90, '%'], ['고기/자석 드롭 간격', 35, '%']]
                           : [['보석 흡수 범위 증가', 25*l, '%'], ['자석 경험치 보너스', Math.min(100, 15*l), '%'], ['드롭 중 자석 비율', 35 + 8*l, '%'], ['고기/자석 드롭 간격', 100 - 10*l, '%']],
   dmgup:    l => [['모든 공격력 증가', 5*l, '%']],
@@ -2487,8 +2487,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.10.2';
+const VERSION = '1.10.3';
 const CHANGELOG = [
+  { v:'1.10.3', date:'2026-11-28', items:[
+    '불꽃 슈팅(축구공 최대 레벨): 불타는 공 3개 → 6개',
+  ] },
   { v:'1.10.2', date:'2026-11-28', items:[
     '불꽃 슈팅(축구공 최대 레벨): 불꽃이 항상 진행 방향의 반대쪽으로 향하고, 픽셀 불꽃 꼬리 추가',
   ] },
