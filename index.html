@@ -248,7 +248,7 @@ const calcMaxHp = () => 100 + 5 * (P.level - 1) + 10 * upLv('vitality') + 100 * 
 function openLevelUp() {
   const pool = WEAPON_KEYS.filter(k => k === 'dmgup' ? maxedCount() >= 5 : P.w[k] < MAXLV), picks = [];
   while (picks.length < 3 && pool.length) {                       // 가중치 추첨 (상점 '스킬 확률')
-    const ws = pool.map(k => 1 + 0.5 * (SAVE.aff[k] || 0));
+    const ws = pool.map(k => 1 + 0.2 * (SAVE.aff[k] || 0));
     let r = Math.random() * ws.reduce((a, b) => a + b, 0), i = 0;
     for (; i < pool.length; i++) { r -= ws[i]; if (r <= 0) break; }
     picks.push(pool.splice(Math.min(i, pool.length - 1), 1)[0]);
@@ -2148,15 +2148,15 @@ function openShop() { shopFrom = state; state = 'shop'; shopMsg = ''; shopConfir
 function closeShop() { state = shopFrom; }
 
 const EQUIP = [
-  { id:'armor',    name:'갑옷',       icon:'armor',  desc:'받는 피해 -4%',        max:5,  cost:l => 2000*(l+1) },
-  { id:'vitality', name:'체력 단련',   icon:'heart',  desc:'최대 체력 +10',        max:10, cost:l => 1000*(l+1) },
-  { id:'power',    name:'힘의 단련',   icon:'kunai',  desc:'모든 피해 +5%',        max:10, cost:l => 1500*(l+1) },
-  { id:'swift',    name:'가벼운 신발', icon:'boots',  desc:'이동속도 +3%',         max:5,  cost:l => 1250*(l+1) },
-  { id:'learn',    name:'수련',       icon:'scroll', desc:'경험치 획득 +5%',      max:10, cost:l => 1100*(l+1) },
-  { id:'greed',    name:'탐욕',       icon:'coin',   desc:'골드 획득 +10%',       max:5,  cost:l => 1500*(l+1) },
-  { id:'revive',   name:'부활 부적',   icon:'heartEvo', desc:'매 판 1회 부활',     max:1,  cost:l => 12500 },
+  { id:'armor',    name:'갑옷',       icon:'armor',  desc:'받는 피해 -4%',        max:5,  cost:l => 2000*(l+1), label:'받는 피해', fmt:l => '-' + 4*l + '%' },
+  { id:'vitality', name:'체력 단련',   icon:'heart',  desc:'최대 체력 +10',        max:10, cost:l => 1000*(l+1), label:'최대 체력', fmt:l => '+' + 10*l },
+  { id:'power',    name:'힘의 단련',   icon:'kunai',  desc:'모든 피해 +5%',        max:10, cost:l => 1500*(l+1), label:'모든 피해', fmt:l => '+' + 5*l + '%' },
+  { id:'swift',    name:'가벼운 신발', icon:'boots',  desc:'이동속도 +3%',         max:5,  cost:l => 1250*(l+1), label:'이동속도', fmt:l => '+' + 3*l + '%' },
+  { id:'learn',    name:'수련',       icon:'scroll', desc:'경험치 획득 +5%',      max:10, cost:l => 1100*(l+1), label:'경험치', fmt:l => '+' + 5*l + '%' },
+  { id:'greed',    name:'탐욕',       icon:'coin',   desc:'골드 획득 +10%',       max:5,  cost:l => 1500*(l+1), label:'골드 획득', fmt:l => '+' + 10*l + '%' },
+  { id:'revive',   name:'부활 부적',   icon:'heartEvo', desc:'매 판 1회 부활',     max:1,  cost:l => 12500, label:'부활', fmt:l => l ? '보유' : '없음' },
 ].map(e => ({ ...e, store:'up' }));
-const AFFINITY = () => WEAPON_KEYS.filter(k => k !== 'dmgup').map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 +50%', max:3, cost:l => 1750*(l+1), store:'aff' }));
+const AFFINITY = () => WEAPON_KEYS.filter(k => k !== 'dmgup').map(k => ({ id:k, name:UPGRADES[k].name, icon:UPGRADES[k].icon, desc:'레벨업 시 등장 확률 증가 (레벨당 +20%)', max:10, cost:l => 1500*(l+1), store:'aff', label:'등장 확률', fmt:l => '+' + 20*l + '%' }));
 
 const CHARS = [
   { id:'ninja',    name:'닌자',        icon:'ninja',     start:'kunai',     cost:0,    desc:'균형 잡힌 기본 캐릭터' },
@@ -2201,7 +2201,7 @@ function drawShop() {
   tabs.forEach((t, i) => button(t, tx0 + i*(bw+tg), 124, bw, 38, () => { shopTab = i; shopScroll = 0; }, shopTab === i ? '#e0932b' : '#475569'));
   const v0 = 176, v1 = H - 70;
   const list = shopTab === 0 ? EQUIP : shopTab === 1 ? AFFINITY() : CHARS;
-  const cw = 250, gap = 14, ch = 104, cols = Math.max(1, Math.min(4, Math.floor((W - 30) / (cw + gap)))), rows = Math.ceil(list.length / cols);
+  const cw = 250, gap = 14, ch = 118, cols = Math.max(1, Math.min(4, Math.floor((W - 30) / (cw + gap)))), rows = Math.ceil(list.length / cols);
   const total = cols * cw + (cols - 1) * gap;
   shopMax = Math.max(0, rows * (ch + gap) + 10 - (v1 - v0)); shopScroll = Math.max(0, Math.min(shopMax, shopScroll));
   ctx.save(); ctx.beginPath(); ctx.rect(0, v0, W, v1 - v0); ctx.clip();
@@ -2229,6 +2229,7 @@ function drawShop() {
     } else {
       ctx.fillText(e.desc, x + 72, y + 46);
       text('Lv ' + lv + '/' + e.max, x + 72, y + 66, 13, '#ffd54a', 'left');
+      if (e.fmt) text(e.label + ' ' + e.fmt(lv) + (maxed ? '' : ' → ' + e.fmt(lv + 1)), x + 72, y + 86, 13, '#9fe29f', 'left');
       if (maxed) text('MAX', x + cw - 12, y + ch - 12, 15, '#ffd54a', 'right');
       else { icon('coin', x + cw - 74, y + ch - 20, 16); text(String(price), x + cw - 12, y + ch - 14, 15, can ? '#ffd54a' : '#e57373', 'right'); }
       if (lv > 0) {                                     // 항목별 초기화 버튼
@@ -2378,8 +2379,12 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.8.0';
+const VERSION = '1.8.1';
 const CHANGELOG = [
+  { v:'1.8.1', date:'2026-11-28', items:[
+    '상점 스킬 확률: 최대 레벨 3 → 10, 레벨당 등장 확률 +20%로 서서히 상승',
+    '상점 장비·스킬 확률 항목마다 현재 효과와 다음 레벨 효과(%) 표시',
+  ] },
   { v:'1.8.0', date:'2026-11-28', items:[
     '방어막: 받는 피해 감소 30%→60%, 적 둔화 25%→40%로 레벨에 따라 서서히 상승',
     '자석: 자석 아이템으로 모은 경험치 보너스 추가 (레벨당 +15%, 최대 +100%)',
