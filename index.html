@@ -2065,7 +2065,14 @@ function text(s, x, y, size, col = '#fff', align = 'center') {
 function drawHUD() {
   bar(0, 0, W, 16, P.xp / P.need, '#4de3ff', '#000a');
   text(`Lv.${P.level}`, W/2, 13, 13);
-  bar(W/2 - 40, H/2 + 26, 80, 7, P.hp / P.maxHp, '#4c4');
+  {   // 플레이어 하단에 고정된 체력바 (카메라가 따라오는 중에도 플레이어를 따라감, 굵은 외곽선)
+    const bw = 84, bh = 10, bx = Math.round(P.x - cam.x + W/2 - bw/2), by = Math.round(P.y - cam.y + H/2 + 26), fr = Math.max(0, Math.min(1, P.hp / P.maxHp));
+    ctx.fillStyle = '#000'; ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
+    ctx.fillStyle = '#3a1414'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = fr > 0.5 ? '#4ade4a' : fr > 0.25 ? '#facc15' : '#ef4444'; ctx.fillRect(bx, by, bw * fr, bh);
+    ctx.fillStyle = '#ffffff55'; ctx.fillRect(bx, by, bw * fr, 3);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(bx - 2.5, by - 2.5, bw + 5, bh + 5);
+  }
   const m = Math.floor(time/60), s = Math.floor(time%60);
   text(`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`, W/2, 44, 24);
   text(`처치 ${kills}`, W - 16, 42, 16, '#fff', 'right');
@@ -2392,8 +2399,11 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.9.2';
+const VERSION = '1.9.3';
 const CHANGELOG = [
+  { v:'1.9.3', date:'2026-11-28', items:[
+    '플레이어 체력바: 굵은 검은 외곽선+흰 테두리로 또렷하게, 플레이어 바로 아래에 고정 (체력에 따라 초록/노랑/빨강)',
+  ] },
   { v:'1.9.2', date:'2026-11-28', items:[
     '쿠나이 외곽선을 굵고 뚜렷하게 (날아가는 쿠나이와 아이콘 모두)',
   ] },
