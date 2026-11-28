@@ -317,7 +317,7 @@ const BOSS_KITS = [
 ];
 function spawnBoss(idx) {
   const b = BOSSES[idx - 1], p = ringPos(80);
-  const pw = Math.max(0, powerLv() - 10), hp = 21000 * [1.0, 1.5, 2.7, 3.7, 4.7][idx - 1] * (1 + 0.035 * pw);   // 스킬이 많을수록 보스도 단단
+  const pw = Math.max(0, powerLv() - 10), hp = 21000 * [1.0, 1.5, 3.5, 5.0, 6.5][idx - 1] * (1 + 0.035 * pw);   // 스킬이 많을수록 보스도 단단
   enemies.push({ type:'boss', boss:true, final:idx === 5, kit:BOSS_KITS[idx - 1], name:b.name, idx, x:p.x, y:p.y, hp, maxHp:hp, speed:55 + idx*4,
     dmg:(30 + idx*8) * (1 + time / 300), r:48, size:120, icon:b.icon, gem:5, flash:0, hitCd:0, gHit:0, kx:0, ky:0, kbMul:0.05,
     atkT:3, dashT:0, windT:0, dx:0, dy:0, spiralT:0, spiralCd:0, spiralA:0 });
@@ -350,9 +350,9 @@ function bossAI(e, dt) {
     } else if (atk === 'slam') {                             // 발구르기: 예고 원 → 범위 피해
       hazards.push({ x:e.x, y:e.y, r:200 + e.idx * 15, t:1.0, tmax:1.0, dmg:e.dmg * 1.2 });
     } else if (atk === 'rain') {                             // 플레이어 주변에 낙하 공격
-      for (let i = 0; i < 6 + e.idx; i++) {
-        const a = Math.random() * 6.28, dd = Math.random() * 230, t0 = 0.9 + i * 0.12;
-        hazards.push({ x:P.x + Math.cos(a)*dd, y:P.y + Math.sin(a)*dd, r:75, t:t0, tmax:t0, dmg:e.dmg * 0.9 });
+      for (let i = 0; i < 4 + Math.ceil(e.idx / 2); i++) {
+        const a = Math.random() * 6.28, dd = Math.random() * 230, t0 = 1.0 + i * 0.14;
+        hazards.push({ x:P.x + Math.cos(a)*dd, y:P.y + Math.sin(a)*dd, r:68, t:t0, tmax:t0, dmg:e.dmg * 0.4 });
       }
     } else if (atk === 'summon') {                           // 졸개 소환
       const types = e.idx < 3 ? ['bug', 'dog'] : e.idx < 5 ? ['knight', 'wolf'] : ['reaper', 'knight'];
@@ -947,7 +947,8 @@ function update(dt) {
       const dashing = e.boss ? bossAI(e, dt) : false;
       if (!dashing) { const slow = lvl('shield') && d < shieldR() + e.r ? 1 - shieldSlow() : 1;
         const mv = (e.ranged && d < 260 ? 0 : 1) * slow * (1 - clockSlow()); e.x += (P.x - e.x)/d * e.speed * dt * mv; e.y += (P.y - e.y)/d * e.speed * dt * mv; }
-      if (e.ranged) { e.fireT -= dt; if (e.fireT <= 0 && d < 520) { e.fireT = 5.5; ebullets.push({ x:e.x, y:e.y, vx:(P.x-e.x)/d*230, vy:(P.y-e.y)/d*230, life:4, r:8, dmg:e.dmg, green:true }); } }
+      if (e.ranged) { e.fireT -= dt * (lvl('shield') && d < shieldR() + e.r ? 1 - shieldSlow() : 1) * (1 - clockSlow());   // 방어막 안에서는 발사도 느려짐
+        if (e.fireT <= 0 && d < 520) { e.fireT = 5.5; ebullets.push({ x:e.x, y:e.y, vx:(P.x-e.x)/d*230, vy:(P.y-e.y)/d*230, life:4, r:8, dmg:e.dmg, green:true }); } }
     }
     e.x += e.kx * dt; e.y += e.ky * dt;
     e.kx *= Math.pow(0.02, dt); e.ky *= Math.pow(0.02, dt);
@@ -2392,8 +2393,13 @@ function drawInfo() {
   }
   text('바깥을 클릭하거나 Esc로 닫기', W/2, y + ch - 14, 13, '#aab', 'center');
 }
-const VERSION = '1.9.0';
+const VERSION = '1.9.1';
 const CHANGELOG = [
+  { v:'1.9.1', date:'2026-11-28', items:[
+    '보스 "붉은 원 낙하" 공격 약화 (개수 감소, 피해 절반 이하, 예고 시간 증가)',
+    '드래곤·외계 군주·죽음의 군주 체력 증가',
+    '방어막 안에서는 독 슬라임의 발사 속도도 느려짐',
+  ] },
   { v:'1.9.0', date:'2026-11-28', items:[
     '계정 삭제 추가: 로그인 후 시작 화면의 "계정 삭제" 버튼, 비밀번호 확인 후 삭제',
     '레벨업 보상을 고르는 중에도 스킬 도감·적 도감을 볼 수 있음 ([C] / [E])',
@@ -2549,9 +2555,9 @@ const ENEMY_DEX = [
 const BOSS_DEX = [
   { name:'티라노 대왕', icon:'trex',   mul:1.0, desc:'돌진(붉은 경로 예고)과 발구르기(범위 충격파)를 씁니다.' },
   { name:'거미 여왕',   icon:'spider', mul:1.5, desc:'조준 사격, 졸개 소환, 나선 탄막, 전방위 탄막을 씁니다.' },
-  { name:'드래곤',      icon:'dragon', mul:2.7, desc:'부채꼴 화염 조준 사격, 화염 낙하, 전방위 탄막, 돌진을 씁니다.' },
-  { name:'외계 군주',   icon:'alien',  mul:3.7, desc:'순간이동 후 사격, 광선 낙하, 나선 탄막, 조준 사격을 씁니다.' },
-  { name:'죽음의 군주', icon:'skull',  mul:4.7, desc:'모든 패턴(돌진·발구르기·낙하·나선·소환·순간이동)을 씁니다. 처치하면 게임 클리어!' },
+  { name:'드래곤',      icon:'dragon', mul:3.5, desc:'부채꼴 화염 조준 사격, 화염 낙하, 전방위 탄막, 돌진을 씁니다.' },
+  { name:'외계 군주',   icon:'alien',  mul:5.0, desc:'순간이동 후 사격, 광선 낙하, 나선 탄막, 조준 사격을 씁니다.' },
+  { name:'죽음의 군주', icon:'skull',  mul:6.5, desc:'모든 패턴(돌진·발구르기·낙하·나선·소환·순간이동)을 씁니다. 처치하면 게임 클리어!' },
 ];
 const BEST_LIST = [...ENEMY_DEX.map(e => ({ ...e, icon:ENEMY_TYPES[e.k].icon })), ...BOSS_DEX.map((b, i) => ({ ...b, boss:i + 1, from:'보스 ' + (i + 1) }))];
 function dexHp(e, t) {   // spawnEnemy 의 체력 증가식과 같은 공식 (스킬 레벨 보정 제외)
